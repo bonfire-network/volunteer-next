@@ -137,7 +137,7 @@ export default function NavigationFrame({ title, subtitle, currentUser, children
               <Text size="1" align="center">
                 © 2026{' '}
                 <Link
-                  href="https://github.com/tohyperborea/volunteer-next"
+                  href="https://github.com/bonfire-network/volunteer-next"
                   target="_blank"
                   rel="noopener"
                 >
