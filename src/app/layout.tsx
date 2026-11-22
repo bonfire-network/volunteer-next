@@ -19,14 +19,6 @@ import { getEventDateRangeDisplayText } from '@/utils/date';
 import { userToVolunteer } from '@/lib/volunteer';
 import { getPermissionsProfile } from '@/utils/permissions';
 
-import {
-  getCustomers,
-  getEvents,
-  getOrderPositions,
-  getOrders,
-  getOrganisers
-} from '@/service/pretix-service'; // TODO: Remove this test code
-
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('Metadata');
   const event = await getCurrentEvent();
@@ -44,8 +36,6 @@ export default async function RootLayout({
 }>) {
   const user = await currentUser();
   const event = await getCurrentEvent();
-
-  console.log(JSON.stringify(await getOrders('sideburnstage', 'sideburn-staging'), null, 2)); // TODO: Remove
 
   const navBarTitle = event ? event.name : process.env.APP_NAME;
   const navBarSubtitle = event ? getEventDateRangeDisplayText({ event }) : undefined;

@@ -6,6 +6,20 @@
 
 const { PRETIX_API_KEY, PRETIX_HOST } = process.env;
 
+const doFetch = async (uri: string) => {
+  const result = await fetch(uri, {
+    headers: {
+      Authorization: `Token ${PRETIX_API_KEY}`,
+      Accept: 'application/json'
+    }
+  });
+  if (!result.ok) {
+    throw new Error(`Pretix call to ${uri} failed: ${result.statusText}`);
+  }
+
+  return result.json();
+};
+
 const getFromPretix = async (endpoint: string) => {
   if (!PRETIX_API_KEY) {
     throw new Error('PRETIX_API_KEY missing in environment');
@@ -13,19 +27,15 @@ const getFromPretix = async (endpoint: string) => {
   if (!PRETIX_HOST) {
     throw new Error('PRETIX_HOST missing in environment');
   }
-  const result = await fetch(`${PRETIX_HOST}/api/v1/${endpoint}`, {
-    headers: {
-      Authorization: `Token ${PRETIX_API_KEY}`,
-      Accept: 'application/json'
-    }
-  });
-  if (!result.ok) {
-    throw new Error(`Pretix ${endpoint} call failed: ${result.statusText}`);
+
+  const results = [];
+  for (let uri = `${PRETIX_HOST}/api/v1/${endpoint}`; uri; ) {
+    const result = await doFetch(uri);
+    results.push(...result.results);
+    uri = result.next;
   }
 
-  // TODO: Support pagination
-
-  return (await result.json()).results;
+  return results;
 };
 
 const withOrganiser =
@@ -46,14 +56,44 @@ const withOrganiser =
     ).flat();
   };
 
+/**
+ * Fetches a list of all Organisers from Pretix
+ * @returns An array of PretixOrganisers
+ */
 export const getOrganisers = async (): Promise<PretixOrganiser[]> =>
   await getFromPretix('organizers');
+
+/**
+ * Fetches a list of all Events from Pretix
+ * @param organiser? - Optional Organiser slug to fetch events for. If omitted, fetches for all organisers
+ * @returns An array of PretixEvents
+ */
 export const getEvents = withOrganiser<PretixEvent>('events');
+
+/**
+ * Fetches a list of all Customers from Pretix
+ * @param organiser? - Optional Organiser slug to fetch customers for. If omitted, fetches for all organisers
+ * @returns An array of PretixCustomers
+ */
 export const getCustomers = withOrganiser<PretixCustomer>('customers');
+
+/**
+ * Fetches a list of all OrderPositions from Pretix
+ * @param organiser - Organiser slug to fetch order positions for
+ * @param event - Event slug to fetch order positions for
+ * @returns An array of PretixOrderPositions
+ */
 export const getOrderPositions = async (
   organiser: string,
   event: string
 ): Promise<PretixOrderPosition[]> =>
   getFromPretix(`organizers/${organiser}/events/${event}/orderpositions`);
+
+/**
+ * Fetches a list of all Orders from Pretix
+ * @param organiser - Organiser slug to fetch orders for
+ * @param event - Event slug to fetch orders for
+ * @returns An array of PretixOrders
+ */
 export const getOrders = async (organiser: string, event: string): Promise<PretixOrder[]> =>
   getFromPretix(`organizers/${organiser}/events/${event}/orders`);
