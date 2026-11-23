@@ -81,7 +81,7 @@ export const getUser = cache(async (userId: UserId, eventId?: EventId): Promise<
     LEFT JOIN role r ON u.id = r."userId"
       AND (r."eventId" IS NULL OR r."eventId" = $2)
     WHERE u.id = $1
-  `,
+   `,
     [userId, eventId ?? null]
   );
 
@@ -221,7 +221,7 @@ export const getFilteredUsers = cache(
         AND (r."eventId" IS NULL OR r."eventId" = $1)
       ${whereClause}
       ORDER BY u."chosenName" ASC
-    `,
+      `,
       queryParams
     );
 
@@ -267,20 +267,20 @@ export const getUsersWithRole = cache(
     }
     const result = await pool.query(
       `
-    SELECT
-      u.id,
-      u.name,
-      u."chosenName",
-      u.email,
-      u."deletedAt",
-      r.type,
-      r."eventId",
-      r."teamId"
-    FROM "user" u
-    LEFT JOIN role r ON u.id = r."userId"
-      AND (r."eventId" IS NULL OR r."eventId" = $1)
-    WHERE EXISTS (${roleQuery.join(' AND ')})
-  `,
+      SELECT
+        u.id,
+        u.name,
+        u."chosenName",
+        u.email,
+        u."deletedAt",
+        r.type,
+        r."eventId",
+        r."teamId"
+      FROM "user" u
+      LEFT JOIN role r ON u.id = r."userId"
+        AND (r."eventId" IS NULL OR r."eventId" = $1)
+      WHERE EXISTS (${roleQuery.join(' AND ')})
+      `,
       queryParams
     );
 
@@ -512,20 +512,20 @@ export const getTeamLeadsForTeam = cache(
   async (teamId: TeamId, eventId: EventId): Promise<User[]> => {
     const result = await pool.query(
       `
-    SELECT
-      u.id,
-      u.name,
-      u."chosenName",
-      u.email,
-      u."deletedAt",
-      r.type,
-      r."eventId",
-      r."teamId"
-    FROM "user" u
-    LEFT JOIN role r ON u.id = r."userId"
-      AND (r."eventId" IS NULL OR r."eventId" = $1)
-    WHERE r.type = 'team-lead' AND r."teamId" = $2
-  `,
+      SELECT
+        u.id,
+        u.name,
+        u."chosenName",
+        u.email,
+        u."deletedAt",
+        r.type,
+        r."eventId",
+        r."teamId"
+      FROM "user" u
+      LEFT JOIN role r ON u.id = r."userId"
+        AND (r."eventId" IS NULL OR r."eventId" = $1)
+      WHERE r.type = 'team-lead' AND r."teamId" = $2
+      `,
       [eventId ?? null, teamId]
     );
 
@@ -555,22 +555,22 @@ export const getVolunteersForShifts = cache(
     }
     const result = await pool.query(
       `
-    SELECT
-      u.id,
-      u.name,
-      u."chosenName",
-      u.email,
-      u."deletedAt",
-      r.type,
-      r."eventId",
-      r."teamId",
-      sv.shift_id
-    FROM "user" u
-    LEFT JOIN role r ON u.id = r."userId"
-      AND (r."eventId" IS NULL OR r."eventId" = $2)
-    JOIN shift_volunteer sv ON sv.user_id = u.id
-    WHERE sv.shift_id = ANY($1::uuid[])
-  `,
+      SELECT
+        u.id,
+        u.name,
+        u."chosenName",
+        u.email,
+        u."deletedAt",
+        r.type,
+        r."eventId",
+        r."teamId",
+        sv.shift_id
+      FROM "user" u
+      LEFT JOIN role r ON u.id = r."userId"
+        AND (r."eventId" IS NULL OR r."eventId" = $2)
+      JOIN shift_volunteer sv ON sv.user_id = u.id
+      WHERE sv.shift_id = ANY($1::uuid[])
+      `,
       [shiftIds, eventId]
     );
 
@@ -594,5 +594,34 @@ export const getVolunteersForShifts = cache(
     });
 
     return volunteersByShift;
+  }
+);
+
+/**
+ * Fetches a list of UserIds given a list of AccountIds
+ * @param accountIds - An array of AccountIds to get UserIds for
+ * @param provider - Optional provider id (ie, 'pretix') to filter by
+ * @returns A list of UserIds
+ */
+export const getUserIdsForAccountIds = cache(
+  async (accountIds: AccountId[], provider?: string): Promise<UserId[]> => {
+    console.log(`Fetching UserIds for AccountIds`, accountIds);
+    if (accountIds.length === 0) {
+      return [];
+    }
+    const params: any[] = [accountIds];
+    if (provider) {
+      params.push(provider);
+    }
+    const result = await pool.query(
+      `
+      SELECT "accountId", "userId"
+      FROM account
+      WHERE "accountId" = ANY($1::text[])
+      ${provider ? `AND "providerId" = $2` : ''}
+      `,
+      params
+    );
+    return result.rows.map((r) => r['userId']);
   }
 );
