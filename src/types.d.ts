@@ -37,6 +37,7 @@ declare global {
   }
 
   type UserId = string;
+  type AccountId = string;
   type EventId = string;
   type TeamId = string;
   type ShiftId = string;
