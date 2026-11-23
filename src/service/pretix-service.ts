@@ -6,7 +6,9 @@
 
 const { PRETIX_API_KEY, PRETIX_HOST } = process.env;
 
-const doFetch = async (uri: string) => {
+const stripSlashes = (host: string) => host.replace(/\/+$/, '');
+
+const doFetch = async <T>(uri: string): Promise<Paginated<T>> => {
   const result = await fetch(uri, {
     headers: {
       Authorization: `Token ${PRETIX_API_KEY}`,
@@ -14,13 +16,13 @@ const doFetch = async (uri: string) => {
     }
   });
   if (!result.ok) {
-    throw new Error(`Pretix call to ${uri} failed: ${result.statusText}`);
+    throw new Error(`Pretix call to ${uri} failed: ${result.status} ${result.statusText}`);
   }
 
   return result.json();
 };
 
-const getFromPretix = async (endpoint: string) => {
+const getFromPretix = async <T>(endpoint: string): Promise<T[]> => {
   if (!PRETIX_API_KEY) {
     throw new Error('PRETIX_API_KEY missing in environment');
   }
@@ -29,10 +31,13 @@ const getFromPretix = async (endpoint: string) => {
   }
 
   const results = [];
-  for (let uri = `${PRETIX_HOST}/api/v1/${endpoint}`; uri; ) {
-    const result = await doFetch(uri);
+  for (let uri: string | null = `${stripSlashes(PRETIX_HOST)}/api/v1/${endpoint}`; uri; ) {
+    const result: Paginated<T> = await doFetch<T>(uri);
     results.push(...result.results);
     uri = result.next;
+    if (uri && new URL(uri).origin !== stripSlashes(PRETIX_HOST)) {
+      throw new Error('Pretix pagination is redirecting outside of PRETIX_HOST');
+    }
   }
 
   return results;
@@ -42,15 +47,14 @@ const withOrganiser =
   <T>(endpoint: string) =>
   async (organiser?: string): Promise<T[]> => {
     if (organiser) {
-      return await getFromPretix(`organizers/${organiser}/${endpoint}`);
+      return await getFromPretix(`organizers/${encodeURIComponent(organiser)}/${endpoint}`);
     }
-    console.debug(`[Pretix] No organiser provided. Fetching all...`);
     const organisers = await getOrganisers();
-    console.debug(`[Pretix] got organisers ${JSON.stringify(organisers, null, 2)}`);
     return (
       await Promise.all(
         organisers.map<Promise<T[]>>(
-          async ({ slug }) => await getFromPretix(`organizers/${slug}/${endpoint}`)
+          async ({ slug }) =>
+            await getFromPretix(`organizers/${encodeURIComponent(slug)}/${endpoint}`)
         )
       )
     ).flat();
@@ -87,7 +91,9 @@ export const getOrderPositions = async (
   organiser: string,
   event: string
 ): Promise<PretixOrderPosition[]> =>
-  getFromPretix(`organizers/${organiser}/events/${event}/orderpositions`);
+  getFromPretix(
+    `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/orderpositions`
+  );
 
 /**
  * Fetches a list of all Orders from Pretix
@@ -96,4 +102,6 @@ export const getOrderPositions = async (
  * @returns An array of PretixOrders
  */
 export const getOrders = async (organiser: string, event: string): Promise<PretixOrder[]> =>
-  getFromPretix(`organizers/${organiser}/events/${event}/orders`);
+  getFromPretix(
+    `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/orders`
+  );

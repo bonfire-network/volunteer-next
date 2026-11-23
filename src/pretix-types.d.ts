@@ -7,6 +7,7 @@
 type MultilingualString = Record<string, string>;
 type DatetimeString = string;
 type DateString = string;
+type Paginated<T> = { next: string | null; results: T[] };
 interface PretixOrganiser {
   name: string;
   slug: string;
@@ -83,7 +84,7 @@ interface PretixAnswer {
   question: number;
   question_identifier: string;
   answer: string;
-  option_idenfiters: string[];
+  option_identifiers: string[];
   options: number[];
 }
 
