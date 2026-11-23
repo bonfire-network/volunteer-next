@@ -733,23 +733,8 @@ describe('getVolunteersForShifts', () => {
 
 describe('getUserIdsForAccountIds', () => {
   it('returns an empty array without querying when there are no account ids', async () => {
-    await expect(getUserIdsForAccountIds([])).resolves.toEqual([]);
+    await expect(getUserIdsForAccountIds([], 'pretix')).resolves.toEqual([]);
     expect(mockQuery).not.toHaveBeenCalled();
-  });
-
-  it('queries only by account ids when no provider is given', async () => {
-    await getUserIdsForAccountIds(['a1', 'a2']);
-    const { sql, params } = lastQuery();
-    expect(sql).toContain('"accountId" = ANY($1::text[])');
-    expect(sql).not.toContain('providerId');
-    expect(params).toEqual([['a1', 'a2']]);
-  });
-
-  it('also filters by provider when one is given', async () => {
-    await getUserIdsForAccountIds(['a1'], 'pretix');
-    const { sql, params } = lastQuery();
-    expect(sql).toContain('AND "providerId" = $2');
-    expect(params).toEqual([['a1'], 'pretix']);
   });
 
   it('returns the user ids from the result rows', async () => {

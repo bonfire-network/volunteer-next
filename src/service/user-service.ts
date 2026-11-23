@@ -600,28 +600,28 @@ export const getVolunteersForShifts = cache(
 /**
  * Fetches a list of UserIds given a list of AccountIds
  * @param accountIds - An array of AccountIds to get UserIds for
- * @param provider - Optional provider id (ie, 'pretix') to filter by
+ * @param provider - provider id (ie, 'pretix') to filter by
  * @returns A list of UserIds
  */
-export const getUserIdsForAccountIds = cache(
-  async (accountIds: AccountId[], provider?: string): Promise<UserId[]> => {
-    console.log(`Fetching UserIds for AccountIds`, accountIds);
-    if (accountIds.length === 0) {
-      return [];
-    }
-    const params: any[] = [accountIds];
-    if (provider) {
-      params.push(provider);
-    }
-    const result = await pool.query(
-      `
+export const getUserIdsForAccountIds = async (
+  accountIds: AccountId[],
+  provider: string
+): Promise<UserId[]> => {
+  if (accountIds.length === 0) {
+    return [];
+  }
+  const params: any[] = [accountIds];
+  if (provider) {
+    params.push(provider);
+  }
+  const result = await pool.query<{ accountId: AccountId; userId: UserId }>(
+    `
       SELECT "accountId", "userId"
       FROM account
       WHERE "accountId" = ANY($1::text[])
-      ${provider ? `AND "providerId" = $2` : ''}
+      AND "providerId" = $2
       `,
-      params
-    );
-    return result.rows.map((r) => r['userId']);
-  }
-);
+    [accountIds, provider]
+  );
+  return result.rows.map((r) => r.userId);
+};
