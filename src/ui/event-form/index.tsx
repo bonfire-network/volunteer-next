@@ -6,7 +6,7 @@
 
 'use client';
 
-import { Flex, Text, TextField, Select, Button } from '@radix-ui/themes';
+import { Flex, TextField, Select, Button } from '@radix-ui/themes';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,6 +14,8 @@ import DatePicker from '../datepicker';
 import { EVENT_SLUG_PATTERN } from '@/validator/event-validator';
 import ImageSelector from '../image-selector';
 import { FormField } from '../form-dialog';
+import TicketPicker from '../ticket-picker';
+import TicketList from '../ticket-list';
 
 interface Props {
   onSubmit: (data: FormData) => Promise<void>;
@@ -22,7 +24,11 @@ interface Props {
   organiserOptions: VolunteerInfo[];
   editingEvent?: EventInfo;
   editingOrganiser?: VolunteerInfo;
+  ticketingContext?: TicketingContext;
 }
+
+const ticketsAreEqual = (a: Ticket, b: Ticket): boolean =>
+  a.provider === b.provider && a.organiser === b.organiser && a.event === b.event && a.id === b.id;
 
 export default function EventForm({
   onSubmit,
@@ -30,7 +36,8 @@ export default function EventForm({
   backOnCancel,
   organiserOptions,
   editingEvent,
-  editingOrganiser
+  editingOrganiser,
+  ticketingContext
 }: Props) {
   const t = useTranslations('EventForm');
   const router = useRouter();
@@ -38,6 +45,7 @@ export default function EventForm({
   const [endDate, setEndDate] = useState<string>('');
   const today = new Date().toISOString().split('T')[0];
   const minEndDate = startDate?.length ? startDate : today;
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   return (
     <Flex asChild direction="column" align="start" gap="6">
       <form action={onSubmit}>
@@ -123,6 +131,31 @@ export default function EventForm({
               </Select.Content>
             </Select.Root>
           </FormField>
+          {ticketingContext && (
+            <FormField
+              name={t('ticketing')}
+              description={t('ticketingDescription')}
+              ariaId="ticketing-label"
+            >
+              <TicketList
+                name="tickets"
+                tickets={tickets}
+                ticketingContext={ticketingContext}
+                onRemove={(ticket) => {
+                  setTickets((old) => old.filter((t) => !ticketsAreEqual(t, ticket)));
+                }}
+              />
+              <TicketPicker
+                ticketingContext={ticketingContext}
+                onSelect={(ticket) => {
+                  const exists = Boolean(tickets.find((t) => ticketsAreEqual(t, ticket)));
+                  if (!exists) {
+                    setTickets((old) => [...old, ticket]);
+                  }
+                }}
+              />
+            </FormField>
+          )}
           <FormField
             name={t('eventLogo')}
             description={t('eventLogoDescription')}

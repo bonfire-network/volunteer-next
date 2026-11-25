@@ -105,3 +105,38 @@ export const getOrders = async (organiser: string, event: string): Promise<Preti
   getFromPretix(
     `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/orders`
   );
+
+export const getItems = async (organiser: string, event: string): Promise<PretixItem[]> =>
+  getFromPretix(
+    `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/items`
+  );
+/**
+ * Generates a TicketingContext using the Pretix API
+ * @returns A TicketingContext loaded from the Pretix API
+ */
+export const getTicketingContext = async (): Promise<TicketingContext> => {
+  const context: TicketingContext = {
+    provider: 'pretix',
+    organisers: {}
+  };
+
+  const organisersData = await getOrganisers();
+  for (const organiser of organisersData) {
+    const organiserContext: TicketingOrganiserContext = {
+      name: organiser.name,
+      events: {}
+    };
+    const eventsData = await getEvents(organiser.slug);
+    for (const event of eventsData) {
+      const itemsData = await getItems(organiser.slug, event.slug);
+      const eventContext: TicketingEventContext = {
+        name: event.name,
+        items: Object.fromEntries(itemsData.map((item) => [item.id, item.name]))
+      };
+      organiserContext.events[event.slug] = eventContext;
+    }
+    context.organisers[organiser.slug] = organiserContext;
+  }
+
+  return context;
+};

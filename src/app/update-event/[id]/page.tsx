@@ -19,6 +19,7 @@ import { getPermissionsProfile } from '@/utils/permissions';
 import { getEventsPath } from '@/utils/path';
 import { hasEventStarted } from '@/utils/date';
 import { uploadImageAction } from '@/lib/image';
+import { getTicketingContext } from '@/service/pretix-service';
 
 const PAGE_KEY = 'UpdateEventPage';
 
@@ -76,6 +77,9 @@ export default async function UpdateEvent({ params }: PageProps<`/update-event/[
     permissionsProfile
   );
 
+  const ticketingContext: TicketingContext | undefined =
+    process.env.TICKETING_PROVIDER === 'pretix' ? await getTicketingContext() : undefined;
+
   return (
     <Flex direction="column" gap="4">
       <Heading my="4">{t('title')}</Heading>
@@ -86,6 +90,7 @@ export default async function UpdateEvent({ params }: PageProps<`/update-event/[
         organiserOptions={volunteers}
         editingEvent={event}
         editingOrganiser={organiser}
+        ticketingContext={ticketingContext}
       />
     </Flex>
   );

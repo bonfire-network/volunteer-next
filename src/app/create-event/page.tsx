@@ -13,6 +13,7 @@ import { usersToVolunteers } from '@/lib/volunteer';
 import { getPermissionsProfile } from '@/utils/permissions';
 import { getEventsPath } from '@/utils/path';
 import { uploadImageAction } from '@/lib/image';
+import { getTicketingContext } from '@/service/pretix-service';
 
 const PAGE_KEY = 'CreateEventPage';
 
@@ -39,6 +40,9 @@ export default async function CreateEvent() {
   const permissionsProfile = getPermissionsProfile(await currentUser());
   const volunteers = usersToVolunteers(await getUsers(), permissionsProfile);
 
+  const ticketingContext: TicketingContext | undefined =
+    process.env.TICKETING_PROVIDER === 'pretix' ? await getTicketingContext() : undefined;
+
   return (
     <Flex direction="column" gap="4">
       <Heading my="4">{t('title')}</Heading>
@@ -48,6 +52,7 @@ export default async function CreateEvent() {
           onSubmit={onSubmit}
           backOnCancel
           organiserOptions={volunteers}
+          ticketingContext={ticketingContext}
         />
       </Card>
     </Flex>
