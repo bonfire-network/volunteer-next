@@ -56,7 +56,7 @@ export default function TicketPicker({ onClose, onSelect, ticketingContext }: Pr
     } else {
       setSelectedEvent(eventKeys[0]);
     }
-  }, [selectedOrganiser]);
+  }, [selectedOrganiser, open]);
 
   useEffect(() => {
     if (itemKeys.length === 0 || hasMultipleItems) {
@@ -64,7 +64,7 @@ export default function TicketPicker({ onClose, onSelect, ticketingContext }: Pr
     } else {
       setSelectedItem(Number(itemKeys[0]));
     }
-  }, [selectedEvent]);
+  }, [selectedEvent, open]);
 
   return (
     <>

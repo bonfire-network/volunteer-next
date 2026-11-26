@@ -14,6 +14,8 @@ import { getPermissionsProfile } from '@/utils/permissions';
 import { getEventsPath } from '@/utils/path';
 import { uploadImageAction } from '@/lib/image';
 import { getTicketingContext } from '@/service/pretix-service';
+import { validateTicketStrings } from '@/validator/ticket-validator';
+import { addTicketRequirementsToEvent } from '@/service/ticketing-service';
 
 const PAGE_KEY = 'CreateEventPage';
 
@@ -27,10 +29,12 @@ export default async function CreateEvent() {
 
     const newEvent = validateNewEvent(data);
     const organiser = validateUserIds(data, 'organiserId')[0]; // Only single organiser supported for now
+    const ticketRequirements = validateTicketStrings(data);
 
     await inTransaction(async (client) => {
       const createdEvent = await createEvent(newEvent, client);
       await addRoleToUsers({ type: 'organiser', eventId: createdEvent.id }, [organiser], client);
+      await addTicketRequirementsToEvent(createdEvent.id, ticketRequirements, client);
     });
     redirect(getEventsPath());
   };
