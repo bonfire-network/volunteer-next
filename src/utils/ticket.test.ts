@@ -10,4 +10,13 @@ describe('Ticket utils', () => {
     });
     expect(result).toBe('pretix/organiser/event/1');
   });
+  it('should deserialise a ticket', () => {
+    const result = ticketFromString('pretix/testorg/testevent/666');
+    expect(result).toEqual({
+      provider: 'pretix',
+      organiser: 'testorg',
+      event: 'testevent',
+      id: 666
+    });
+  });
 });
