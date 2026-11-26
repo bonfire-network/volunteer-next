@@ -10,11 +10,10 @@ import FormDialog, { FormField } from '@/ui/form-dialog';
 import { Link2Icon } from '@radix-ui/react-icons';
 import { Button, Dialog, Flex, Select } from '@radix-ui/themes';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Props {
   ticketingContext: TicketingContext;
-  open?: boolean;
   onClose?: () => void;
   onSelect?: (ticket: Ticket) => void;
 }
@@ -31,22 +30,41 @@ export default function TicketPicker({ onClose, onSelect, ticketingContext }: Pr
   );
 
   const eventKeys = selectedOrganiser
-    ? Object.keys(ticketingContext.organisers[selectedOrganiser].events)
+    ? Object.keys(ticketingContext.organisers[selectedOrganiser]?.events ?? {})
     : [];
   const hasMultipleEvents = eventKeys.length > 1;
   const [selectedEvent, setSelectedEvent] = useState<TicketEvent | undefined>(
     !hasMultipleEvents ? eventKeys[0] : undefined
   );
 
-  const itemKeys = selectedOrganiser
-    ? Object.keys(ticketingContext.organisers[selectedOrganiser].events[selectedEvent].items)
-    : [];
+  const itemKeys =
+    selectedOrganiser && selectedEvent
+      ? Object.keys(
+          ticketingContext.organisers[selectedOrganiser]?.events[selectedEvent]?.items ?? {}
+        )
+      : [];
   const hasMultipleItems = itemKeys.length > 1;
   const [selectedItem, setSelectedItem] = useState<TicketId | undefined>(
     !hasMultipleItems ? Number(itemKeys[0]) : undefined
   );
 
   const canSubmit = selectedOrganiser && selectedEvent && selectedItem;
+
+  useEffect(() => {
+    if (eventKeys.length === 0 || hasMultipleEvents) {
+      setSelectedEvent(undefined);
+    } else {
+      setSelectedEvent(eventKeys[0]);
+    }
+  }, [selectedOrganiser]);
+
+  useEffect(() => {
+    if (itemKeys.length === 0 || hasMultipleItems) {
+      setSelectedItem(undefined);
+    } else {
+      setSelectedItem(Number(itemKeys[0]));
+    }
+  }, [selectedEvent]);
 
   return (
     <>
@@ -95,7 +113,7 @@ export default function TicketPicker({ onClose, onSelect, ticketingContext }: Pr
                 required
                 name="ticketingEvent"
                 disabled={!hasMultipleEvents}
-                defaultValue={hasMultipleEvents ? undefined : eventKeys[0]}
+                value={selectedEvent ?? ''}
                 onValueChange={setSelectedEvent}
               >
                 <Select.Trigger aria-labelledby="ticketing-event-label" placeholder={t('event')} />
@@ -117,7 +135,7 @@ export default function TicketPicker({ onClose, onSelect, ticketingContext }: Pr
                 required
                 name="ticketingItem"
                 disabled={!hasMultipleItems}
-                defaultValue={hasMultipleItems ? undefined : itemKeys[0]}
+                value={String(selectedItem ?? '')}
                 onValueChange={(value) => setSelectedItem(Number(value))}
               >
                 <Select.Trigger aria-labelledby="ticketing-item-label" placeholder={t('item')} />

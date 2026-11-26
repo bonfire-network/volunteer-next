@@ -9,7 +9,7 @@
 import { ticketToString } from '@/utils/ticket';
 import { LinkBreak2Icon } from '@radix-ui/react-icons';
 import { Card, Flex, IconButton, Text } from '@radix-ui/themes';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 
 interface Props {
   tickets: Ticket[];
@@ -20,6 +20,7 @@ interface Props {
 
 export default function TicketList({ tickets, ticketingContext, onRemove, name }: Props) {
   const locale = useLocale();
+  const t = useTranslations('TicketList');
   return (
     <Flex gap="2" wrap="wrap">
       {tickets.map((ticket) => (
@@ -38,18 +39,15 @@ export default function TicketList({ tickets, ticketingContext, onRemove, name }
             <Flex direction="column" gap="1">
               <Flex direction="column">
                 <Text size="1" weight="light" color="gray">
-                  {ticketingContext.organisers[ticket.organiser].name}
-                </Text>
-                <Text size="1" weight="light" color="gray">
-                  {ticketingContext.organisers[ticket.organiser].events[ticket.event].name[locale]}
+                  {ticketingContext.organisers[ticket.organiser]?.events[ticket.event]?.name[
+                    locale
+                  ] ?? ticket.event}
                 </Text>
               </Flex>
               <Text>
-                {
-                  ticketingContext.organisers[ticket.organiser].events[ticket.event].items[
-                    ticket.id
-                  ][locale]
-                }
+                {(ticketingContext.organisers[ticket.organiser]?.events[ticket.event]?.items[
+                  ticket.id
+                ] ?? {})[locale] ?? ticket.id}
               </Text>
             </Flex>
             {onRemove && (
@@ -57,6 +55,12 @@ export default function TicketList({ tickets, ticketingContext, onRemove, name }
                 type="button"
                 variant="ghost"
                 color="red"
+                aria-label={t('disconnect', {
+                  ticketName:
+                    (ticketingContext.organisers[ticket.organiser]?.events[ticket.event]?.items[
+                      ticket.id
+                    ] ?? {})[locale] ?? ticket.id
+                })}
                 onClick={() => onRemove(ticket)}
               >
                 <LinkBreak2Icon />

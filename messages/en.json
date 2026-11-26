@@ -491,5 +491,8 @@
     "organiser": "Organiser",
     "event": "Event",
     "item": "Item"
+  },
+  "TicketList": {
+    "disconnect": "Disconnect {ticketName}"
   }
 }
