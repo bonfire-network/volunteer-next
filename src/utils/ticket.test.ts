@@ -1,6 +1,6 @@
 import { ticketToString, ticketFromString } from './ticket';
 
-describe.skip('Ticket utils', () => {
+describe('Ticket utils', () => {
   it('should serialise a ticket', () => {
     const result = ticketToString({
       provider: 'pretix',
