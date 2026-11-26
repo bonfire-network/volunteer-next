@@ -9,7 +9,7 @@
  * @param ticket the Ticket to serialise
  * @returns A unique ticket string
  */
-export const ticketToString = (ticket: Ticket): string =>
+export const ticketToString = (ticket: Ticket): TicketString =>
   `${ticket.provider}/${ticket.organiser}/${ticket.event}/${ticket.id}`;
 
 /**
@@ -18,7 +18,7 @@ export const ticketToString = (ticket: Ticket): string =>
  * @returns A Ticket
  * @throws Error if the ticket string is malformed
  */
-export const ticketFromString = (s: string): Ticket => {
+export const ticketFromString = (s: TicketString): Ticket => {
   const parts = s.split('/');
   if (parts.length !== 4) {
     throw new Error(`Invalid ticket string: ${s}`);

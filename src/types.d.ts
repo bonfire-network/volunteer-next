@@ -159,6 +159,7 @@ declare global {
   type TicketOrganiser = string;
   type TicketEvent = string;
   type TicketId = number;
+  type TicketString = string;
   interface Ticket {
     provider: TicketProvider;
     organiser: TicketOrganiser;

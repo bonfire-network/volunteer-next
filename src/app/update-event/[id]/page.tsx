@@ -20,6 +20,13 @@ import { getEventsPath } from '@/utils/path';
 import { hasEventStarted } from '@/utils/date';
 import { uploadImageAction } from '@/lib/image';
 import { getTicketingContext } from '@/service/pretix-service';
+import { validateTicketStrings } from '@/validator/ticket-validator';
+import {
+  addTicketRequirementsToEvent,
+  getTicketRequirementsForEvent,
+  removeTicketRequirementsFromEvent
+} from '@/service/ticketing-service';
+import { ticketToString } from '@/utils/ticket';
 
 const PAGE_KEY = 'UpdateEventPage';
 
@@ -51,6 +58,13 @@ export default async function UpdateEvent({ params }: PageProps<`/update-event/[
       .filter((userId) => userId !== organiser);
     const shouldAdd = toRemove.length === existingOrganisers.length;
 
+    const ticketRequirements = new Set(validateTicketStrings(data));
+    const existingTicketRequirements = new Set(
+      (await getTicketRequirementsForEvent(newEvent.id)).map(ticketToString)
+    );
+    const ticketRequirementsToAdd = ticketRequirements.difference(existingTicketRequirements);
+    const ticketRequirementsToRemove = existingTicketRequirements.difference(ticketRequirements);
+
     await inTransaction(async (client) => {
       await updateEvent(newEvent, client);
       if (toRemove.length > 0) {
@@ -59,6 +73,8 @@ export default async function UpdateEvent({ params }: PageProps<`/update-event/[
       if (shouldAdd) {
         await addRoleToUsers(roleToAdd, [organiser], client);
       }
+      await addTicketRequirementsToEvent(newEvent.id, [...ticketRequirementsToAdd]);
+      await removeTicketRequirementsFromEvent(newEvent.id, [...ticketRequirementsToRemove]);
     });
     redirect(getEventsPath());
   };
@@ -79,6 +95,7 @@ export default async function UpdateEvent({ params }: PageProps<`/update-event/[
 
   const ticketingContext: TicketingContext | undefined =
     process.env.TICKETING_PROVIDER === 'pretix' ? await getTicketingContext() : undefined;
+  const ticketRequirements = await getTicketRequirementsForEvent(event.id);
 
   return (
     <Flex direction="column" gap="4">
@@ -90,6 +107,7 @@ export default async function UpdateEvent({ params }: PageProps<`/update-event/[
         organiserOptions={volunteers}
         editingEvent={event}
         editingOrganiser={organiser}
+        editingTicketRequirements={ticketRequirements}
         ticketingContext={ticketingContext}
       />
     </Flex>

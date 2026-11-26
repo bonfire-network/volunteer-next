@@ -24,6 +24,7 @@ interface Props {
   organiserOptions: VolunteerInfo[];
   editingEvent?: EventInfo;
   editingOrganiser?: VolunteerInfo;
+  editingTicketRequirements?: Ticket[];
   ticketingContext?: TicketingContext;
 }
 
@@ -37,6 +38,7 @@ export default function EventForm({
   organiserOptions,
   editingEvent,
   editingOrganiser,
+  editingTicketRequirements,
   ticketingContext
 }: Props) {
   const t = useTranslations('EventForm');
@@ -45,7 +47,7 @@ export default function EventForm({
   const [endDate, setEndDate] = useState<string>('');
   const today = new Date().toISOString().split('T')[0];
   const minEndDate = startDate?.length ? startDate : today;
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>(editingTicketRequirements ?? []);
   return (
     <Flex asChild direction="column" align="start" gap="6">
       <form action={onSubmit}>
