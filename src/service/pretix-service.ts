@@ -4,11 +4,11 @@
  * @author Michael Townsend <@continuities>
  */
 
-const { PRETIX_API_KEY, PRETIX_HOST } = process.env;
+const { PRETIX_API_KEY, PRETIX_HOST, PRETIX_ORGANISER } = process.env;
 
 const stripSlashes = (host: string) => host.replace(/\/+$/, '');
 
-const doFetch = async <T>(uri: string): Promise<Paginated<T>> => {
+const doFetch = async <T>(uri: string): Promise<T> => {
   const result = await fetch(uri, {
     headers: {
       Authorization: `Token ${PRETIX_API_KEY}`,
@@ -22,7 +22,7 @@ const doFetch = async <T>(uri: string): Promise<Paginated<T>> => {
   return result.json();
 };
 
-const getFromPretix = async <T>(endpoint: string): Promise<T[]> => {
+const getListFromPretix = async <T>(endpoint: string): Promise<T[]> => {
   if (!PRETIX_API_KEY) {
     throw new Error('PRETIX_API_KEY missing in environment');
   }
@@ -30,9 +30,9 @@ const getFromPretix = async <T>(endpoint: string): Promise<T[]> => {
     throw new Error('PRETIX_HOST missing in environment');
   }
 
-  const results = [];
+  const results: T[] = [];
   for (let uri: string | null = `${stripSlashes(PRETIX_HOST)}/api/v1/${endpoint}`; uri; ) {
-    const result: Paginated<T> = await doFetch<T>(uri);
+    const result: Paginated<T> = await doFetch<Paginated<T>>(uri);
     results.push(...result.results);
     uri = result.next;
     if (uri && new URL(uri).origin !== stripSlashes(PRETIX_HOST)) {
@@ -43,29 +43,48 @@ const getFromPretix = async <T>(endpoint: string): Promise<T[]> => {
   return results;
 };
 
+const getFromPretix = async <T>(endpoint: string): Promise<T> => {
+  if (!PRETIX_API_KEY) {
+    throw new Error('PRETIX_API_KEY missing in environment');
+  }
+  if (!PRETIX_HOST) {
+    throw new Error('PRETIX_HOST missing in environment');
+  }
+  const uri = `${stripSlashes(PRETIX_HOST)}/api/v1/${endpoint}`;
+  return doFetch<T>(uri);
+};
+
 const withOrganiser =
   <T>(endpoint: string) =>
   async (organiser?: string): Promise<T[]> => {
     if (organiser) {
-      return await getFromPretix(`organizers/${encodeURIComponent(organiser)}/${endpoint}`);
+      return await getListFromPretix(`organizers/${encodeURIComponent(organiser)}/${endpoint}`);
     }
     const organisers = await getOrganisers();
     return (
       await Promise.all(
         organisers.map<Promise<T[]>>(
           async ({ slug }) =>
-            await getFromPretix(`organizers/${encodeURIComponent(slug)}/${endpoint}`)
+            await getListFromPretix(`organizers/${encodeURIComponent(slug)}/${endpoint}`)
         )
       )
     ).flat();
   };
 
 /**
+ * Fetches a single organiser from Pretix
+ * @param organiser - Organiser slug to fetch data for
+ * @returns A PretixOrganiser
+ */
+export const getOrganiser = async (organiser: TicketOrganiser): Promise<PretixOrganiser> =>
+  await getFromPretix(`organizers/${encodeURIComponent(organiser)}`);
+
+/**
  * Fetches a list of all Organisers from Pretix
  * @returns An array of PretixOrganisers
  */
 export const getOrganisers = async (): Promise<PretixOrganiser[]> =>
-  await getFromPretix('organizers');
+  await getListFromPretix('organizers');
 
 /**
  * Fetches a list of all Events from Pretix
@@ -91,7 +110,7 @@ export const getOrderPositions = async (
   organiser: string,
   event: string
 ): Promise<PretixOrderPosition[]> =>
-  getFromPretix(
+  getListFromPretix(
     `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/orderpositions`
   );
 
@@ -102,12 +121,12 @@ export const getOrderPositions = async (
  * @returns An array of PretixOrders
  */
 export const getOrders = async (organiser: string, event: string): Promise<PretixOrder[]> =>
-  getFromPretix(
+  getListFromPretix(
     `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/orders`
   );
 
 export const getItems = async (organiser: string, event: string): Promise<PretixItem[]> =>
-  getFromPretix(
+  getListFromPretix(
     `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/items`
   );
 /**
@@ -119,8 +138,8 @@ export const getTicketingContext = async (): Promise<TicketingContext> => {
     provider: 'pretix',
     organisers: {}
   };
-
-  const organisersData = await getOrganisers();
+  const organiser = process.env.PRETIX_ORGANISER;
+  const organisersData = organiser ? [await getOrganiser(organiser)] : await getOrganisers();
   for (const organiser of organisersData) {
     const organiserContext: TicketingOrganiserContext = {
       name: organiser.name,

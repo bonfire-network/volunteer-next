@@ -67,27 +67,29 @@ export default function TicketPicker({ onClose, onSelect, ticketingContext }: Pr
             {t('title')}
           </Dialog.Title>
           <Flex direction="column" gap="4" flexGrow="1">
-            <FormField name={t('organiser')} ariaId="ticketing-organiser-label">
-              <Select.Root
-                required
-                name="ticketingOrganiser"
-                defaultValue={selectedOrganiser}
-                disabled={!hasMultipleOrganisers}
-                onValueChange={setSelectedOrganiser}
-              >
-                <Select.Trigger
-                  aria-labelledby="ticketing-organiser-label"
-                  placeholder={t('organiser')}
-                />
-                <Select.Content>
-                  {organiserKeys.map((organiserKey) => (
-                    <Select.Item key={organiserKey} value={organiserKey}>
-                      {ticketingContext.organisers[organiserKey].name}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-            </FormField>
+            {hasMultipleOrganisers && (
+              <FormField name={t('organiser')} ariaId="ticketing-organiser-label">
+                <Select.Root
+                  required
+                  name="ticketingOrganiser"
+                  defaultValue={selectedOrganiser}
+                  disabled={!hasMultipleOrganisers}
+                  onValueChange={setSelectedOrganiser}
+                >
+                  <Select.Trigger
+                    aria-labelledby="ticketing-organiser-label"
+                    placeholder={t('organiser')}
+                  />
+                  <Select.Content>
+                    {organiserKeys.map((organiserKey) => (
+                      <Select.Item key={organiserKey} value={organiserKey}>
+                        {ticketingContext.organisers[organiserKey].name}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              </FormField>
+            )}
             <FormField name={t('event')} ariaId="ticketing-event-label">
               <Select.Root
                 required
