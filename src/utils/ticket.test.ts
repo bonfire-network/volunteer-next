@@ -19,4 +19,15 @@ describe('Ticket utils', () => {
       id: 666
     });
   });
+  it('should fail to deserialise a bad string', () => {
+    expect(() => {
+      ticketFromString('bad/string');
+    }).toThrow();
+    expect(() => {
+      ticketFromString('pretix/org/evnt/nan');
+    }).toThrow();
+    expect(() => {
+      ticketFromString('satan/org/evnt/1');
+    }).toThrow();
+  });
 });
