@@ -1,17 +1,26 @@
 import { validateTicketStrings } from './ticket-validator';
 
 describe('validateTicketStrings', () => {
-  it('should validate a list of ticket strings', () => {
+  it.each([
+    {
+      tickets: ['pretix/org/evt/1', 'pretix/org/evt/2', 'pretix/org/evt/3'],
+      isValid: true
+    },
+    {
+      tickets: ['invalid/org/evt/1'],
+      isValid: false
+    },
+    {
+      tickets: ['pretix/org/evt/1', 'bad/string'],
+      isValid: false
+    }
+  ])('should validate $tickets as $isValid', ({ tickets, isValid }) => {
     const formData = new FormData();
-    formData.append('tickets', 'ticket-a');
-    formData.append('tickets', 'ticket-b');
-    formData.append('tickets', 'ticket-c');
-    formData.append('tickets', 'ticket-d');
-    expect(validateTicketStrings(formData)).toEqual([
-      'ticket-a',
-      'ticket-b',
-      'ticket-c',
-      'ticket-d'
-    ]);
+    tickets.forEach((t) => formData.append('tickets', t));
+    if (isValid) {
+      expect(validateTicketStrings(formData)).toEqual(tickets);
+    } else {
+      expect(() => validateTicketStrings(formData)).toThrow();
+    }
   });
 });

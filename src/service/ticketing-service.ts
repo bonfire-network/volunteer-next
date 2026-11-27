@@ -8,6 +8,11 @@ import pool from '@/db';
 import { ticketFromString } from '@/utils/ticket';
 import { PoolClient } from 'pg';
 
+/**
+ * Fetches ticket requirements for an event
+ * @param event The eventId for which to fetch ticket requirements
+ * @returns A promise resolving to a list of Ticket objects
+ */
 export const getTicketRequirementsForEvent = async (event: EventId): Promise<Ticket[]> => {
   if (!process.env.TICKETING_PROVIDER) {
     return [];
@@ -25,6 +30,13 @@ export const getTicketRequirementsForEvent = async (event: EventId): Promise<Tic
   return res.rows.map((row) => ticketFromString(row.ticket));
 };
 
+/**
+ * Adds ticket requirements to an event
+ * @param event The eventId for which to add ticket requirements
+ * @param toAdd List of TicketStrings to add to the event
+ * @param client Optional PoolClient for transactions
+ * @returns Promise<void>
+ */
 export const addTicketRequirementsToEvent = async (
   event: EventId,
   toAdd: TicketString[],
@@ -51,6 +63,13 @@ export const addTicketRequirementsToEvent = async (
   );
 };
 
+/**
+ * Removes ticket requirements from an event
+ * @param event The eventId for which to remove ticket requirements
+ * @param toAdd List of TicketStrings to remove from the event
+ * @param client Optional PoolClient for transactions
+ * @returns Promise<void>
+ */
 export const removeTicketRequirementsFromEvent = async (
   event: EventId,
   toRemove: TicketString[],

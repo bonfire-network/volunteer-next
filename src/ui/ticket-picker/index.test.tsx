@@ -273,10 +273,7 @@ describe('TicketPicker', () => {
 
   // ---------------------------------------------------------------------------
   // The tests below describe the intended behaviour when there is more than one
-  // choice at some level. They are expected to FAIL against the component as it
-  // stands (see the notes that came with this file): it throws when an event hasn't
-  // been selected yet, and it never updates its preselected values after the
-  // initial render.
+  // choice at some level.
   // ---------------------------------------------------------------------------
   describe('choosing among several organisers, events and ticket types', () => {
     it('enables the event select with that organiser’s events once an organiser is chosen', async () => {

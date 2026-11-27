@@ -16,6 +16,7 @@ import ImageSelector from '../image-selector';
 import { FormField } from '../form-dialog';
 import TicketPicker from '../ticket-picker';
 import TicketList from '../ticket-list';
+import { ticketToString } from '@/utils/ticket';
 
 interface Props {
   onSubmit: (data: FormData) => Promise<void>;
@@ -28,8 +29,7 @@ interface Props {
   ticketingContext?: TicketingContext;
 }
 
-const ticketsAreEqual = (a: Ticket, b: Ticket): boolean =>
-  a.provider === b.provider && a.organiser === b.organiser && a.event === b.event && a.id === b.id;
+const ticketsAreEqual = (a: Ticket, b: Ticket): boolean => ticketToString(a) === ticketToString(b);
 
 export default function EventForm({
   onSubmit,

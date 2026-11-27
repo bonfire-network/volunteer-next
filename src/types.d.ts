@@ -5,7 +5,6 @@
  * @since 2025-11-10
  */
 
-import { string } from 'better-auth';
 import type { AppRoutes } from '../../../../.next/types/routes';
 
 declare global {
@@ -172,11 +171,11 @@ declare global {
   }
   interface TicketingOrganiserContext {
     name: string;
-    events: Record<TicketEvent, TicketEventContext>;
+    events: Record<TicketEvent, TicketingEventContext>;
   }
   interface TicketingContext {
     provider: TicketProvider;
-    organisers: Record<TicketOrganiser, TicketOrganiserContext>;
+    organisers: Record<TicketOrganiser, TicketingOrganiserContext>;
   }
 
   // Filters

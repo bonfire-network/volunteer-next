@@ -125,6 +125,12 @@ export const getOrders = async (organiser: string, event: string): Promise<Preti
     `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/orders`
   );
 
+/**
+ * Fetches a list of all Items from Pretix
+ * @param organiser - Organiser slug to fetch orders for
+ * @param event - Event slug to fetch orders for
+ * @returns An array of PretixItems
+ */
 export const getItems = async (organiser: string, event: string): Promise<PretixItem[]> =>
   getListFromPretix(
     `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/items`
@@ -133,29 +139,44 @@ export const getItems = async (organiser: string, event: string): Promise<Pretix
  * Generates a TicketingContext using the Pretix API
  * @returns A TicketingContext loaded from the Pretix API
  */
-export const getTicketingContext = async (): Promise<TicketingContext> => {
-  const context: TicketingContext = {
-    provider: 'pretix',
-    organisers: {}
-  };
-  const organiser = process.env.PRETIX_ORGANISER;
-  const organisersData = organiser ? [await getOrganiser(organiser)] : await getOrganisers();
-  for (const organiser of organisersData) {
-    const organiserContext: TicketingOrganiserContext = {
-      name: organiser.name,
-      events: {}
-    };
-    const eventsData = await getEvents(organiser.slug);
-    for (const event of eventsData) {
-      const itemsData = await getItems(organiser.slug, event.slug);
-      const eventContext: TicketingEventContext = {
-        name: event.name,
-        items: Object.fromEntries(itemsData.map((item) => [item.id, item.name]))
-      };
-      organiserContext.events[event.slug] = eventContext;
-    }
-    context.organisers[organiser.slug] = organiserContext;
-  }
+export const getTicketingContext = async (): Promise<TicketingContext | undefined> => {
+  const organisersData = PRETIX_ORGANISER
+    ? [await getOrganiser(PRETIX_ORGANISER)]
+    : await getOrganisers();
 
-  return context;
+  try {
+    return {
+      provider: 'pretix',
+      organisers: Object.fromEntries(
+        await Promise.all(
+          organisersData.map<Promise<[TicketOrganiser, TicketingOrganiserContext]>>(async (o) => [
+            o.slug,
+            {
+              name: o.name,
+              events: Object.fromEntries(
+                await Promise.all(
+                  (await getEvents(o.slug)).map<Promise<[TicketEvent, TicketingEventContext]>>(
+                    async (e) => [
+                      e.slug,
+                      {
+                        name: e.name,
+                        items: Object.fromEntries(
+                          (await getItems(o.slug, e.slug)).map<[TicketId, MultilingualString]>(
+                            (item) => [Number(item.id), item.name]
+                          )
+                        )
+                      }
+                    ]
+                  )
+                )
+              )
+            }
+          ])
+        )
+      )
+    };
+  } catch (e) {
+    console.error('Fetching Pretix context failed', e);
+    return undefined;
+  }
 };

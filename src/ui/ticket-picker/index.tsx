@@ -64,7 +64,7 @@ export default function TicketPicker({ onClose, onSelect, ticketingContext }: Pr
     } else {
       setSelectedItem(Number(itemKeys[0]));
     }
-  }, [selectedEvent, open]);
+  }, [selectedOrganiser, selectedEvent, open]);
 
   return (
     <>
@@ -90,7 +90,7 @@ export default function TicketPicker({ onClose, onSelect, ticketingContext }: Pr
                 <Select.Root
                   required
                   name="ticketingOrganiser"
-                  defaultValue={selectedOrganiser}
+                  value={selectedOrganiser ?? ''}
                   disabled={!hasMultipleOrganisers}
                   onValueChange={setSelectedOrganiser}
                 >
@@ -144,7 +144,7 @@ export default function TicketPicker({ onClose, onSelect, ticketingContext }: Pr
                     <Select.Item key={itemKey} value={itemKey}>
                       {
                         ticketingContext.organisers[selectedOrganiser!].events[selectedEvent!]
-                          .items[itemKey][locale]
+                          .items[Number(itemKey)][locale]
                       }
                     </Select.Item>
                   ))}

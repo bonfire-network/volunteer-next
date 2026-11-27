@@ -147,10 +147,6 @@ describe('TicketList', () => {
       expect(container.querySelector('input')).not.toBeInTheDocument();
     });
 
-    // Expected behaviour, which the component doesn't have yet: it currently throws when
-    // a ticket points at something missing from the ticketing context, which takes the
-    // whole form down. Instead it should fall back to the raw identifiers (the event
-    // slug and the ticket id) and keep working. These tests are expected to FAIL until then.
     describe('tickets missing from the ticketing context', () => {
       it('falls back to the raw event slug and ticket id when the organiser is unknown', () => {
         render(ui({ tickets: [unknownOrganiser] }));
@@ -298,10 +294,6 @@ describe('TicketList', () => {
       expect(screen.getByText('Volunteer ticket')).toBeInTheDocument();
     });
 
-    // Expected behaviour, which the component doesn't have yet: the remove button is
-    // icon-only with no aria-label, so screen readers just announce "button". Its label
-    // should come from the translations (key "remove", given the ticket's name as `name`).
-    // These tests are expected to FAIL until then.
     describe('accessible names', () => {
       it('labels each remove button with the name of its ticket', () => {
         render(ui({ tickets: [volunteer, dayPass], onRemove: jest.fn() }));

@@ -73,8 +73,8 @@ export default async function UpdateEvent({ params }: PageProps<`/update-event/[
       if (shouldAdd) {
         await addRoleToUsers(roleToAdd, [organiser], client);
       }
-      await addTicketRequirementsToEvent(newEvent.id, [...ticketRequirementsToAdd]);
-      await removeTicketRequirementsFromEvent(newEvent.id, [...ticketRequirementsToRemove]);
+      await addTicketRequirementsToEvent(newEvent.id, [...ticketRequirementsToAdd], client);
+      await removeTicketRequirementsFromEvent(newEvent.id, [...ticketRequirementsToRemove], client);
     });
     redirect(getEventsPath());
   };
