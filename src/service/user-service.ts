@@ -601,14 +601,14 @@ export const getVolunteersForShifts = cache(
  * Fetches a list of UserIds given a list of AccountIds
  * @param accountIds - An array of AccountIds to get UserIds for
  * @param provider - provider id (ie, 'pretix') to filter by
- * @returns A list of UserIds
+ * @returns A map of AccountId to UserId
  */
 export const getUserIdsForAccountIds = async (
   accountIds: AccountId[],
   provider: string
-): Promise<UserId[]> => {
+): Promise<Map<AccountId, UserId>> => {
   if (accountIds.length === 0) {
-    return [];
+    return new Map();
   }
   const params: any[] = [accountIds];
   if (provider) {
@@ -623,5 +623,5 @@ export const getUserIdsForAccountIds = async (
       `,
     [accountIds, provider]
   );
-  return result.rows.map((r) => r.userId);
+  return new Map(result.rows.map((r) => [r.accountId, r.userId]));
 };

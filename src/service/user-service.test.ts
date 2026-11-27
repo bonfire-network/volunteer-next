@@ -733,7 +733,7 @@ describe('getVolunteersForShifts', () => {
 
 describe('getUserIdsForAccountIds', () => {
   it('returns an empty array without querying when there are no account ids', async () => {
-    await expect(getUserIdsForAccountIds([], 'pretix')).resolves.toEqual([]);
+    await expect(getUserIdsForAccountIds([], 'pretix')).resolves.toEqual(new Map());
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
@@ -742,10 +742,15 @@ describe('getUserIdsForAccountIds', () => {
       { accountId: 'a1', userId: 'u1' },
       { accountId: 'a2', userId: 'u2' }
     ]);
-    await expect(getUserIdsForAccountIds(['a1', 'a2'], 'pretix')).resolves.toEqual(['u1', 'u2']);
+    await expect(getUserIdsForAccountIds(['a1', 'a2'], 'pretix')).resolves.toEqual(
+      new Map([
+        ['a1', 'u1'],
+        ['a2', 'u2']
+      ])
+    );
   });
 
   it('returns an empty array when no accounts match', async () => {
-    await expect(getUserIdsForAccountIds(['nope'], 'pretix')).resolves.toEqual([]);
+    await expect(getUserIdsForAccountIds(['nope'], 'pretix')).resolves.toEqual(new Map());
   });
 });

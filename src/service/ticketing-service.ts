@@ -5,7 +5,7 @@
  */
 
 import pool from '@/db';
-import { ticketFromString } from '@/utils/ticket';
+import { ticketFromString, ticketToString } from '@/utils/ticket';
 import { PoolClient } from 'pg';
 
 /**
@@ -87,4 +87,87 @@ export const removeTicketRequirementsFromEvent = async (
     `,
     [event, toRemove]
   );
+};
+
+/**
+ * Saves tickets to the database, by accountId
+ * @param accountTickets Tickets to add, by AccountId
+ * @param client Optional PoolClient for transactions
+ * @returns Promise<void>
+ */
+export const addTickets = async (
+  accountTickets: Record<AccountId, Ticket[]>,
+  client?: PoolClient
+) => {
+  const accountIds = Object.keys(accountTickets);
+  if (!process.env.TICKETING_PROVIDER || accountIds.length === 0) {
+    return;
+  }
+  const db = client || pool;
+  const params = accountIds.flatMap((accountId) =>
+    accountTickets[accountId].map<[AccountId, TicketString]>((t) => [accountId, ticketToString(t)])
+  );
+  if (params.length === 0) {
+    return;
+  }
+  const placeholders = params
+    .map((_, index) => {
+      const base = index * 2;
+      return `($${base + 1}, $${base + 2})`;
+    })
+    .join(', ');
+  await db.query(
+    `
+    INSERT INTO account_ticket ("accountId", "ticket")
+    VALUES ${placeholders}
+    ON CONFLICT ("accountId", "ticket") DO NOTHING
+    `,
+    params.flat()
+  );
+};
+
+/**
+ * Saves sync history to the database
+ * @param provider Provider that was synced
+ * @param status Status of the sync
+ * @param client Optional PoolClient for transactions
+ * @returns Promise<void>
+ */
+export const saveTicketSyncHistory = async (
+  provider: TicketProvider,
+  status: TicketSyncHistoryStatus,
+  client?: PoolClient
+) => {
+  if (!process.env.TICKETING_PROVIDER) {
+    return;
+  }
+  const db = client || pool;
+  await db.query(
+    `
+    INSERT INTO ticket_sync_history ("provider", "status")
+    VALUES ($1, $2)
+    `,
+    [provider, status]
+  );
+};
+
+/**
+ * Fetches all tickets for a UserId
+ * @param userId The UserId for which to fetch tickets
+ * @returns A list of Tickets for that UserId
+ */
+export const getTicketsForUser = async (userId: UserId): Promise<Ticket[]> => {
+  if (!process.env.TICKETING_PROVIDER) {
+    return [];
+  }
+  const res = await pool.query(
+    `
+    SELECT ticket 
+    FROM account_ticket 
+    JOIN account ON account_ticket."accountId" = account."accountId"
+    WHERE account."userId" = $1
+    `,
+    [userId]
+  );
+  return res.rows.map((row) => ticketFromString(row.ticket));
 };

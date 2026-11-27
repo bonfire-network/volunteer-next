@@ -1,10 +1,13 @@
 import type { PoolClient } from 'pg';
 import pool from '@/db';
-import { ticketFromString } from '@/utils/ticket';
+import { ticketFromString, ticketToString } from '@/utils/ticket';
 import {
   getTicketRequirementsForEvent,
   addTicketRequirementsToEvent,
-  removeTicketRequirementsFromEvent
+  removeTicketRequirementsFromEvent,
+  addTickets,
+  saveTicketSyncHistory,
+  getTicketsForUser
 } from './ticketing-service';
 
 // --- Mocks -----------------------------------------------------------------
@@ -14,10 +17,11 @@ jest.mock('@/db', () => ({
   default: { query: jest.fn() }
 }));
 
-jest.mock('@/utils/ticket', () => ({ ticketFromString: jest.fn() }));
+jest.mock('@/utils/ticket', () => ({ ticketFromString: jest.fn(), ticketToString: jest.fn() }));
 
 const mockQuery = pool.query as unknown as jest.Mock;
 const mockTicketFromString = ticketFromString as unknown as jest.Mock;
+const mockTicketToString = ticketToString as unknown as jest.Mock;
 
 // --- Helpers -----------------------------------------------------------------
 
@@ -57,6 +61,11 @@ beforeEach(() => {
     const [provider, organiser, event, id] = value.split(':');
     return { provider, organiser, event, id: Number(id) } as Ticket;
   });
+  // The inverse of the parser above
+  mockTicketToString.mockImplementation(
+    (ticket: Ticket): string =>
+      `${ticket.provider}:${ticket.organiser}:${ticket.event}:${ticket.id}`
+  );
 });
 
 afterAll(() => {
@@ -215,5 +224,215 @@ describe('removeTicketRequirementsFromEvent', () => {
     await expect(removeTicketRequirementsFromEvent(EVENT_ID, ['t1'])).rejects.toThrow(
       'delete failed'
     );
+  });
+});
+
+// --- addTickets ------------------------------------------------------------------
+
+const makeTicket = (organiser: string, event: string, id: number): Ticket => ({
+  provider: 'pretix',
+  organiser,
+  event,
+  id
+});
+
+const volunteer = makeTicket('org-a', 'festival-2026', 11);
+const dayPass = makeTicket('org-a', 'festival-2026', 12);
+const meetup = makeTicket('org-b', 'meetup', 31);
+
+// What ticketToString returns for the tickets above, in the format the mock uses
+const VOLUNTEER = 'pretix:org-a:festival-2026:11';
+const DAY_PASS = 'pretix:org-a:festival-2026:12';
+const MEETUP = 'pretix:org-b:meetup:31';
+
+describe('addTickets', () => {
+  it.each([[undefined], ['']])('does nothing when TICKETING_PROVIDER is %p', async (value) => {
+    setProvider(value);
+    await addTickets({ 'acc-1': [volunteer] });
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when there are no accounts', async () => {
+    await addTickets({});
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('inserts a single ticket for an account', async () => {
+    await addTickets({ 'acc-1': [volunteer] });
+    const { sql, params } = lastQuery();
+    expect(sql).toContain('INSERT INTO account_ticket ("accountId", "ticket")');
+    expect(sql).toContain('VALUES ($1, $2)');
+    expect(params).toEqual(['acc-1', VOLUNTEER]);
+  });
+
+  it('inserts several tickets for one account in a single statement', async () => {
+    await addTickets({ 'acc-1': [volunteer, dayPass] });
+    const { sql, params } = lastQuery();
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(sql).toContain('VALUES ($1, $2), ($3, $4)');
+    expect(params).toEqual(['acc-1', VOLUNTEER, 'acc-1', DAY_PASS]);
+  });
+
+  it('inserts tickets for several accounts in a single statement, keeping each ticket with its own account', async () => {
+    await addTickets({ 'acc-1': [volunteer, dayPass], 'acc-2': [meetup] });
+    const { sql, params } = lastQuery();
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(sql).toContain('VALUES ($1, $2), ($3, $4), ($5, $6)');
+    expect(params).toEqual(['acc-1', VOLUNTEER, 'acc-1', DAY_PASS, 'acc-2', MEETUP]);
+  });
+
+  it('passes a flat list of parameters, not nested pairs', async () => {
+    await addTickets({ 'acc-1': [volunteer], 'acc-2': [meetup] });
+    const { params } = lastQuery();
+    expect(params.every((param: unknown) => typeof param === 'string')).toBe(true);
+  });
+
+  it('serialises every ticket with ticketToString', async () => {
+    await addTickets({ 'acc-1': [volunteer, dayPass], 'acc-2': [meetup] });
+    expect(mockTicketToString).toHaveBeenCalledTimes(3);
+    expect(mockTicketToString).toHaveBeenCalledWith(volunteer);
+    expect(mockTicketToString).toHaveBeenCalledWith(dayPass);
+    expect(mockTicketToString).toHaveBeenCalledWith(meetup);
+  });
+
+  it('ignores tickets that are already saved for the account', async () => {
+    await addTickets({ 'acc-1': [volunteer] });
+    expect(lastQuery().sql).toContain('ON CONFLICT ("accountId", "ticket") DO NOTHING');
+  });
+
+  it('skips accounts that have no tickets, and still saves the others', async () => {
+    await addTickets({ 'acc-1': [], 'acc-2': [meetup] });
+    const { sql, params } = lastQuery();
+    expect(sql).toContain('VALUES ($1, $2)');
+    expect(sql).not.toContain('($3, $4)');
+    expect(params).toEqual(['acc-2', MEETUP]);
+  });
+
+  it('uses the pool when no client is given', async () => {
+    await addTickets({ 'acc-1': [volunteer] });
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the provided client instead of the pool', async () => {
+    const { client, query } = makeClient();
+    await addTickets({ 'acc-1': [volunteer] }, client);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(lastQuery(query).params).toEqual(['acc-1', VOLUNTEER]);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('propagates database errors', async () => {
+    mockQuery.mockRejectedValueOnce(new Error('insert failed'));
+    await expect(addTickets({ 'acc-1': [volunteer] })).rejects.toThrow('insert failed');
+  });
+
+  describe('when every account has an empty ticket list (expected to fail until addTickets checks for this)', () => {
+    it('does not run a query', async () => {
+      await addTickets({ 'acc-1': [], 'acc-2': [] });
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+  });
+});
+
+// --- saveTicketSyncHistory ------------------------------------------------------
+
+describe('saveTicketSyncHistory', () => {
+  // Cast through unknown so these tests don't depend on the exact TicketSyncHistoryStatus type
+  const status = (value: string) => value as unknown as TicketSyncHistoryStatus;
+
+  it.each([[undefined], ['']])('does nothing when TICKETING_PROVIDER is %p', async (value) => {
+    setProvider(value);
+    await saveTicketSyncHistory('pretix', status('success'));
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('inserts one row with the provider and status', async () => {
+    await saveTicketSyncHistory('pretix', status('success'));
+    const { sql, params } = lastQuery();
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(sql).toContain('INSERT INTO ticket_sync_history ("provider", "status")');
+    expect(sql).toContain('VALUES ($1, $2)');
+    expect(params).toEqual(['pretix', 'success']);
+  });
+
+  it.each([['success'], ['failure'], ['partial']])(
+    'records a "%s" status as given',
+    async (value) => {
+      await saveTicketSyncHistory('pretix', status(value));
+      expect(lastQuery().params).toEqual(['pretix', value]);
+    }
+  );
+
+  it('uses the pool when no client is given', async () => {
+    await saveTicketSyncHistory('pretix', status('success'));
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the provided client instead of the pool', async () => {
+    const { client, query } = makeClient();
+    await saveTicketSyncHistory('pretix', status('success'), client);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(lastQuery(query).params).toEqual(['pretix', 'success']);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('propagates database errors', async () => {
+    mockQuery.mockRejectedValueOnce(new Error('insert failed'));
+    await expect(saveTicketSyncHistory('pretix', status('success'))).rejects.toThrow(
+      'insert failed'
+    );
+  });
+});
+
+// --- getTicketsForUser -------------------------------------------------------------
+
+describe('getTicketsForUser', () => {
+  const USER_ID = 'user-1';
+
+  it.each([[undefined], ['']])(
+    'returns an empty array without querying when TICKETING_PROVIDER is %p',
+    async (value) => {
+      setProvider(value);
+      await expect(getTicketsForUser(USER_ID)).resolves.toEqual([]);
+      expect(mockQuery).not.toHaveBeenCalled();
+    }
+  );
+
+  it('looks up the tickets of the user’s accounts', async () => {
+    await getTicketsForUser(USER_ID);
+    const { sql, params } = lastQuery();
+    expect(sql).toContain('FROM account_ticket');
+    expect(sql).toContain('JOIN account ON account_ticket."accountId" = account."accountId"');
+    expect(sql).toContain('WHERE account."userId" = $1');
+    expect(params).toEqual([USER_ID]);
+  });
+
+  it('returns an empty array when the user has no tickets', async () => {
+    await expect(getTicketsForUser(USER_ID)).resolves.toEqual([]);
+    expect(mockTicketFromString).not.toHaveBeenCalled();
+  });
+
+  it('converts each row’s ticket string to a Ticket, in row order', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ ticket: VOLUNTEER }, { ticket: MEETUP }] });
+
+    const tickets = await getTicketsForUser(USER_ID);
+
+    expect(tickets).toEqual([volunteer, meetup]);
+    expect(mockTicketFromString).toHaveBeenCalledTimes(2);
+    expect(mockTicketFromString).toHaveBeenCalledWith(VOLUNTEER);
+    expect(mockTicketFromString).toHaveBeenCalledWith(MEETUP);
+  });
+
+  it('propagates database errors', async () => {
+    mockQuery.mockRejectedValueOnce(new Error('connection lost'));
+    await expect(getTicketsForUser(USER_ID)).rejects.toThrow('connection lost');
+  });
+
+  it('propagates errors from parsing a malformed ticket string', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ ticket: 'garbage' }] });
+    mockTicketFromString.mockImplementationOnce(() => {
+      throw new Error('Invalid ticket string');
+    });
+    await expect(getTicketsForUser(USER_ID)).rejects.toThrow('Invalid ticket string');
   });
 });

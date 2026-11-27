@@ -1,8 +1,8 @@
 import metadata from '@/i18n/metadata';
 import { archiveEvent, deleteEvent, getFilteredEvents } from '@/service/event-service';
-import { Heading, Flex, Card, Text, Button, Box } from '@radix-ui/themes';
+import { Heading, Flex, Card, Text, Button } from '@radix-ui/themes';
 import { getTranslations } from 'next-intl/server';
-import { PlusIcon } from '@radix-ui/react-icons';
+import { PlusIcon, ReloadIcon } from '@radix-ui/react-icons';
 import { checkAuthorisation } from '@/session';
 import EventCard from '@/ui/event-card';
 import NextLink from 'next/link';
@@ -12,6 +12,8 @@ import { hasEventEnded, hasEventStarted } from '@/utils/date';
 import { unauthorized } from 'next/navigation';
 import { recordToEventFilters } from '@/utils/event-filters';
 import EventFilters from '@/ui/event-filters';
+import { syncTickets } from '@/lib/ticketing';
+import ActionButton from '@/ui/action-button';
 
 const PAGE_KEY = 'EventsManagementPage';
 
@@ -52,16 +54,27 @@ export default async function EventsDashboard({ searchParams }: PageProps<`/even
     revalidatePath(getEventsPath());
   };
 
+  const syncTicketsAction = async () => {
+    'use server';
+    await checkAuthorisation([{ type: 'admin' }]);
+    await syncTickets();
+  };
+
   return (
     <Flex direction="column" gap="4">
       <Heading my="4">{t('title')}</Heading>
-      <Box>
+      <Flex gap="2">
         <Button variant="soft" asChild>
           <NextLink href={getCreateEventPath()}>
             <PlusIcon /> {t('createEvent')}
           </NextLink>
         </Button>
-      </Box>
+        {process.env.TICKETING_PROVIDER && (
+          <ActionButton variant="soft" action={syncTicketsAction}>
+            <ReloadIcon /> {t('syncTickets')}
+          </ActionButton>
+        )}
+      </Flex>
       <EventFilters withFilters={['searchQuery', 'showArchived']} />
       {events.length === 0 && (
         <Card>

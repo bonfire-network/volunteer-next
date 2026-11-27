@@ -117,13 +117,13 @@ export const getOrderPositions = async (
 /**
  * Fetches a list of all Orders from Pretix
  * @param organiser - Organiser slug to fetch orders for
- * @param event - Event slug to fetch orders for
+ * @param event - Optional event slug to fetch orders for. Otherwise fetches across all events
  * @returns An array of PretixOrders
  */
-export const getOrders = async (organiser: string, event: string): Promise<PretixOrder[]> =>
-  getListFromPretix(
-    `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/orders`
-  );
+export const getOrders = async (organiser: string, event?: string): Promise<PretixOrder[]> => {
+  const eventComponent = event ? `/events/${encodeURIComponent(event)}` : '';
+  return getListFromPretix(`organizers/${encodeURIComponent(organiser)}${eventComponent}/orders`);
+};
 
 /**
  * Fetches a list of all Items from Pretix

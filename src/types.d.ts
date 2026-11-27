@@ -159,6 +159,7 @@ declare global {
   type TicketEvent = string;
   type TicketId = number;
   type TicketString = string;
+  type TicketSyncHistoryStatus = 'success' | 'timeout' | 'refused';
   interface Ticket {
     provider: TicketProvider;
     organiser: TicketOrganiser;

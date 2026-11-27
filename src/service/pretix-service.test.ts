@@ -377,6 +377,13 @@ describe('getOrders / getOrderPositions', () => {
 
     await expect(getOrders('acme', 'fest')).resolves.toEqual(orders);
   });
+  it('getOrders requests the organiser orders endpoint if event is omitted', async () => {
+    const orders = [{ code: 'ABC12' }];
+    useRoutes({ [`${HOST}/api/v1/organizers/acme/orders`]: page(orders) });
+    const { getOrders } = await load();
+
+    await expect(getOrders('acme')).resolves.toEqual(orders);
+  });
 
   it('getOrderPositions requests the event’s orderpositions endpoint', async () => {
     const positions = [{ id: 1 }, { id: 2 }];
