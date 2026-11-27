@@ -247,7 +247,9 @@
     "faviconDescription": "Select a 16x16px image to upload. Supported file types are ICO, SVG, PNG, JPG, and WEBP.",
     "createButton": "Create Event",
     "updateButton": "Update Event",
-    "cancelButton": "Cancel"
+    "cancelButton": "Cancel",
+    "ticketing": "Ticketing",
+    "ticketingDescription": "To restrict volunteering to ticket-holders, connect one or more tickets that grant volunteer access."
   },
   "EventCard": {
     "dateSpan": "{startDate} to {endDate}",
@@ -481,5 +483,16 @@
   "TimeSelect": {
     "hour": "{parent} hour",
     "minute": "{parent} minute"
+  },
+  "TicketPicker": {
+    "title": "Connect a ticket",
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "organiser": "Organiser",
+    "event": "Event",
+    "item": "Item"
+  },
+  "TicketList": {
+    "disconnect": "Disconnect {ticketName}"
   }
 }

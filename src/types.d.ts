@@ -46,6 +46,8 @@ declare global {
   type UrlSlug = string;
   type TimeString = string; // ISO 8601 time string, e.g. "14:30"
   type EventDay = number; // 0 for first day, 1 for second day, etc.
+  type LocaleKey = string;
+  type MultilingualString = Record<LocaleKey, string>;
 
   type EventDayTime = {
     day: EventDay;
@@ -144,6 +146,36 @@ declare global {
     roles?: UserRole[];
     email?: string;
     fullName?: string;
+  }
+
+  interface NamedOption<T> {
+    id: T;
+    name: string | MultilingualString;
+  }
+
+  // Ticketing integration
+  type TicketProvider = 'pretix';
+  type TicketOrganiser = string;
+  type TicketEvent = string;
+  type TicketId = number;
+  type TicketString = string;
+  interface Ticket {
+    provider: TicketProvider;
+    organiser: TicketOrganiser;
+    event: TicketEvent;
+    id: TicketId;
+  }
+  interface TicketingEventContext {
+    name: MultilingualString;
+    items: Record<TicketId, MultilingualString>;
+  }
+  interface TicketingOrganiserContext {
+    name: string;
+    events: Record<TicketEvent, TicketingEventContext>;
+  }
+  interface TicketingContext {
+    provider: TicketProvider;
+    organisers: Record<TicketOrganiser, TicketingOrganiserContext>;
   }
 
   // Filters
