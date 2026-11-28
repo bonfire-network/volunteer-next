@@ -1026,10 +1026,6 @@ describe('getTicketingContext', () => {
         items: { 31: { en: 'B ticket' } }
       });
     });
-
-    // Expected behaviour, which getTicketingContext doesn't have yet: it lists every item,
-    // including inactive ones and ones that aren't tickets (merchandise, add-ons).
-    it.todo('leaves out inactive items and items that do not grant admission');
   });
 
   describe('errors', () => {
