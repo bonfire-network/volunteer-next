@@ -2,6 +2,7 @@ import { inTransaction } from '@/db';
 import metadata from '@/i18n/metadata';
 import { sendUserShiftEmail } from '@/lib/email';
 import { getDeleteShiftAction, getSaveShiftAction } from '@/lib/shifts';
+import { isTicketingEnabled } from '@/lib/ticketing';
 import {
   getQualificationsForEvent,
   getQualificationsForUser
@@ -16,6 +17,7 @@ import {
   getShiftSignupCount
 } from '@/service/shift-service';
 import { getTeamBySlug, getTeamsForEvent } from '@/service/team-service';
+import { userHasTicket } from '@/service/ticketing-service';
 import { getVolunteersForShifts } from '@/service/user-service';
 import {
   checkAuthorisation,
@@ -82,6 +84,7 @@ export default async function TeamPage({ params, searchParams }: PageProps<`/tea
   const t = await getTranslations(PAGE_KEY);
   const user = (await currentUser())!; // checkAuthorisation guarantees this is not null
   const permissions = getPermissionsProfile(user);
+  const hasTicket = await userHasTicket(user.id, event.id);
   const shiftVolunteers = await getVolunteersForShifts(
     shifts.map((s) => s.id),
     permissions,
@@ -117,6 +120,10 @@ export default async function TeamPage({ params, searchParams }: PageProps<`/tea
     }
     if (shift.teamId !== team.id) {
       throw new Error('Shift does not belong to this team');
+    }
+
+    if (isTicketingEnabled() && !(await userHasTicket(user.id, event.id))) {
+      throw new Error('User does not have a ticket to this event');
     }
 
     if (shift.requirements.length > 0) {
@@ -204,7 +211,7 @@ export default async function TeamPage({ params, searchParams }: PageProps<`/tea
         onSaveShift={isEditable ? onSaveShift : undefined}
         onDeleteShift={isEditable ? onDeleteShift : undefined}
         editableShifts={editableShifts}
-        onSignup={onSignup}
+        onSignup={isTicketingEnabled() && !hasTicket ? undefined : onSignup}
         onCancel={onCancel}
       />
     </Flex>

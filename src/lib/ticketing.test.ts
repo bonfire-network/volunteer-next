@@ -1,7 +1,7 @@
 import { inTransaction } from '@/db';
 import { getOrders, getOrganiser, getOrganisers } from '@/service/pretix-service';
 import { addTickets, removeTickets, saveTicketSyncHistory } from '@/service/ticketing-service';
-import { syncTickets } from './ticketing';
+import { isTicketingEnabled, syncTickets } from './ticketing';
 
 // --- Mocks -----------------------------------------------------------------
 
@@ -111,6 +111,20 @@ beforeEach(() => {
 afterAll(() => {
   ENV_KEYS.forEach((key) => setEnv(key, originalEnv[key]));
   jest.restoreAllMocks();
+});
+
+// --- isTicketingEnabled -------------------------------------------------------------------
+
+describe('isTicketingEnabled', () => {
+  it.each([
+    { provider: undefined, enabled: false },
+    { provider: '', enabled: false },
+    { provider: 'eventbrite', enabled: false },
+    { provider: 'pretix', enabled: true }
+  ])('returns $enabled when TICKETING_PROVIDER is $provider', ({ provider, enabled }) => {
+    setEnv('TICKETING_PROVIDER', provider);
+    expect(isTicketingEnabled()).toBe(enabled);
+  });
 });
 
 // --- syncTickets -------------------------------------------------------------------

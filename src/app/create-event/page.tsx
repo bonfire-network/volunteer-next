@@ -16,6 +16,7 @@ import { uploadImageAction } from '@/lib/image';
 import { getTicketingContext } from '@/service/pretix-service';
 import { validateTicketStrings } from '@/validator/ticket-validator';
 import { addTicketRequirementsToEvent } from '@/service/ticketing-service';
+import { isTicketingEnabled } from '@/lib/ticketing';
 
 const PAGE_KEY = 'CreateEventPage';
 
@@ -44,8 +45,9 @@ export default async function CreateEvent() {
   const permissionsProfile = getPermissionsProfile(await currentUser());
   const volunteers = usersToVolunteers(await getUsers(), permissionsProfile);
 
-  const ticketingContext: TicketingContext | undefined =
-    process.env.TICKETING_PROVIDER === 'pretix' ? await getTicketingContext() : undefined;
+  const ticketingContext: TicketingContext | undefined = isTicketingEnabled()
+    ? await getTicketingContext()
+    : undefined;
 
   return (
     <Flex direction="column" gap="4">

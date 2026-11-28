@@ -8,7 +8,8 @@ import {
   addTickets,
   saveTicketSyncHistory,
   getTicketsForUser,
-  removeTickets
+  removeTickets,
+  userHasTicket
 } from './ticketing-service';
 
 // --- Mocks -----------------------------------------------------------------
@@ -524,5 +525,78 @@ describe('getTicketsForUser', () => {
       throw new Error('Invalid ticket string');
     });
     await expect(getTicketsForUser(USER_ID)).rejects.toThrow('Invalid ticket string');
+  });
+});
+
+// --- userHasTicket -------------------------------------------------------------
+
+describe('userHasTicket', () => {
+  const USER_ID = 'user-1';
+
+  /** The pool's next query returns this value for the "hasTicket" column. */
+  const mockHasTicket = (hasTicket: boolean) =>
+    mockQuery.mockResolvedValueOnce({ rows: [{ hasTicket }] });
+
+  it.each([{ provider: undefined }, { provider: '' }, { provider: 'eventbrite' }])(
+    'returns true without querying when TICKETING_PROVIDER is $provider',
+    async ({ provider }) => {
+      setProvider(provider);
+
+      await expect(userHasTicket(USER_ID, EVENT_ID)).resolves.toBe(true);
+
+      expect(mockQuery).not.toHaveBeenCalled();
+    }
+  );
+
+  describe('when ticketing is enabled', () => {
+    it('asks the database once', async () => {
+      mockHasTicket(true);
+
+      await userHasTicket(USER_ID, EVENT_ID);
+
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes the user id and the event id as the query parameters, in that order', async () => {
+      mockHasTicket(true);
+
+      await userHasTicket(USER_ID, EVENT_ID);
+
+      expect(lastQuery().params).toEqual([USER_ID, EVENT_ID]);
+    });
+
+    it('checks for ticket requirements on the event, and for a matching ticket held by the user', async () => {
+      mockHasTicket(true);
+
+      await userHasTicket(USER_ID, EVENT_ID);
+
+      const { sql } = lastQuery();
+      expect(sql).toContain('NOT EXISTS (SELECT 1 FROM ticket_requirement WHERE "eventId" = $2)');
+      expect(sql).toContain('JOIN account_ticket atk ON atk."accountId" = acc."accountId"');
+      expect(sql).toContain('JOIN ticket_requirement tr ON tr.ticket = atk.ticket');
+      expect(sql).toContain('WHERE acc."userId" = $1 AND tr."eventId" = $2');
+      expect(sql).toContain('AS "hasTicket"');
+    });
+
+    it.each([{ hasTicket: true }, { hasTicket: false }])(
+      'returns $hasTicket when the database says $hasTicket',
+      async ({ hasTicket }) => {
+        mockHasTicket(hasTicket);
+
+        await expect(userHasTicket(USER_ID, EVENT_ID)).resolves.toBe(hasTicket);
+      }
+    );
+
+    it('uses the value of the hasTicket column, not the number of rows returned', async () => {
+      mockQuery.mockResolvedValueOnce({ rows: [{ hasTicket: false }], rowCount: 1 });
+
+      await expect(userHasTicket(USER_ID, EVENT_ID)).resolves.toBe(false);
+    });
+
+    it('propagates database errors', async () => {
+      mockQuery.mockRejectedValueOnce(new Error('connection lost'));
+
+      await expect(userHasTicket(USER_ID, EVENT_ID)).rejects.toThrow('connection lost');
+    });
   });
 });
