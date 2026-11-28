@@ -2,7 +2,8 @@
   "EventsManagementPage": {
     "title": "Events Dashboard",
     "noEvents": "No events yet!",
-    "createEvent": "Add event"
+    "createEvent": "Add event",
+    "syncTickets": "Resync tickets"
   },
   "DashboardPage": {
     "yourDashboard": "Your dashboard",

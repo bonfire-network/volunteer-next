@@ -5,7 +5,7 @@
  */
 
 import pool from '@/db';
-import { ticketFromString } from '@/utils/ticket';
+import { ticketFromString, ticketToString } from '@/utils/ticket';
 import { PoolClient } from 'pg';
 
 /**
@@ -87,4 +87,124 @@ export const removeTicketRequirementsFromEvent = async (
     `,
     [event, toRemove]
   );
+};
+
+const getAccountTicketParams = (accountTickets: Record<AccountId, OrderedTicket[]>) => {
+  const accountIdsParam: AccountId[] = [];
+  const ticketsParam: TicketString[] = [];
+  const orderRefsParam: string[] = [];
+  for (const [accountId, tickets] of Object.entries(accountTickets)) {
+    for (const ticket of tickets) {
+      accountIdsParam.push(accountId);
+      ticketsParam.push(ticketToString(ticket));
+      orderRefsParam.push(ticket.orderRef);
+    }
+  }
+  return { accountIdsParam, ticketsParam, orderRefsParam };
+};
+
+/**
+ * Saves tickets to the database, by accountId
+ * @param accountTickets Tickets to add, by AccountId
+ * @param client Optional PoolClient for transactions
+ * @returns Promise<void>
+ */
+export const addTickets = async (
+  accountTickets: Record<AccountId, OrderedTicket[]>,
+  client?: PoolClient
+) => {
+  if (!process.env.TICKETING_PROVIDER) {
+    return;
+  }
+  const db = client || pool;
+  const { accountIdsParam, ticketsParam, orderRefsParam } = getAccountTicketParams(accountTickets);
+
+  if (accountIdsParam.length === 0) {
+    return;
+  }
+
+  await db.query(
+    `
+    INSERT INTO account_ticket ("accountId", "ticket", "orderRef")
+    SELECT * FROM unnest($1::text[], $2::text[], $3::text[])
+    ON CONFLICT DO NOTHING
+    `,
+    [accountIdsParam, ticketsParam, orderRefsParam]
+  );
+};
+
+/**
+ * Removes tickets from the database, by accountId
+ * @param accountTickets Tickets to remove, by AccountId
+ * @param client Optional PoolClient for transactions
+ * @returns Promise<void>
+ */
+export const removeTickets = async (
+  accountTickets: Record<AccountId, OrderedTicket[]>,
+  client?: PoolClient
+) => {
+  if (!process.env.TICKETING_PROVIDER) {
+    return;
+  }
+  const db = client || pool;
+  const { accountIdsParam, ticketsParam, orderRefsParam } = getAccountTicketParams(accountTickets);
+  if (accountIdsParam.length === 0) {
+    return;
+  }
+
+  await db.query(
+    `
+    DELETE FROM account_ticket
+    WHERE ("accountId", "ticket", "orderRef") IN (
+      SELECT * FROM unnest($1::text[], $2::text[], $3::text[])
+    )
+    `,
+    [accountIdsParam, ticketsParam, orderRefsParam]
+  );
+};
+
+/**
+ * Saves sync history to the database
+ * @param provider Provider that was synced
+ * @param status Status of the sync
+ * @param client Optional PoolClient for transactions
+ * @returns Promise<void>
+ */
+export const saveTicketSyncHistory = async (
+  provider: TicketProvider,
+  status: TicketSyncHistoryStatus,
+  client?: PoolClient
+) => {
+  if (!process.env.TICKETING_PROVIDER) {
+    return;
+  }
+  const db = client || pool;
+  await db.query(
+    `
+    INSERT INTO ticket_sync_history ("provider", "status")
+    VALUES ($1, $2)
+    `,
+    [provider, status]
+  );
+};
+
+/**
+ * Fetches all tickets for a UserId
+ * @param userId The UserId for which to fetch tickets
+ * @returns A list of Tickets for that UserId
+ */
+export const getTicketsForUser = async (userId: UserId): Promise<Ticket[]> => {
+  if (!process.env.TICKETING_PROVIDER) {
+    return [];
+  }
+  const res = await pool.query(
+    `
+    SELECT ticket, "orderRef"
+    FROM account_ticket 
+    JOIN account ON account_ticket."accountId" = account."accountId"
+    WHERE account."userId" = $1
+    `,
+    [userId]
+  );
+  return res.rows.map((row) => ({ ...ticketFromString(row.ticket), orderRef: row.orderRef }));
 };

@@ -159,11 +159,15 @@ declare global {
   type TicketEvent = string;
   type TicketId = number;
   type TicketString = string;
+  type TicketSyncHistoryStatus = 'success' | 'timeout' | 'refused';
   interface Ticket {
     provider: TicketProvider;
     organiser: TicketOrganiser;
     event: TicketEvent;
     id: TicketId;
+  }
+  interface OrderedTicket extends Ticket {
+    orderRef: string;
   }
   interface TicketingEventContext {
     name: MultilingualString;

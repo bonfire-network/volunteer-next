@@ -8,7 +8,7 @@ const { PRETIX_API_KEY, PRETIX_HOST, PRETIX_ORGANISER } = process.env;
 
 const stripSlashes = (host: string) => host.replace(/\/+$/, '');
 
-const doFetch = async <T>(uri: string): Promise<T> => {
+const doFetch = async <T>(uri: string | URL): Promise<T> => {
   const result = await fetch(uri, {
     headers: {
       Authorization: `Token ${PRETIX_API_KEY}`,
@@ -22,7 +22,10 @@ const doFetch = async <T>(uri: string): Promise<T> => {
   return result.json();
 };
 
-const getListFromPretix = async <T>(endpoint: string): Promise<T[]> => {
+const getListFromPretix = async <T>(
+  endpoint: string,
+  params: Record<string, string> = {}
+): Promise<T[]> => {
   if (!PRETIX_API_KEY) {
     throw new Error('PRETIX_API_KEY missing in environment');
   }
@@ -31,7 +34,11 @@ const getListFromPretix = async <T>(endpoint: string): Promise<T[]> => {
   }
 
   const results: T[] = [];
-  for (let uri: string | null = `${stripSlashes(PRETIX_HOST)}/api/v1/${endpoint}`; uri; ) {
+  const url = new URL(`${stripSlashes(PRETIX_HOST)}/api/v1/${endpoint}`);
+  for (const [k, v] of Object.entries(params)) {
+    url.searchParams.set(k, v);
+  }
+  for (let uri: string | URL | null = url; uri; ) {
     const result: Paginated<T> = await doFetch<Paginated<T>>(uri);
     results.push(...result.results);
     uri = result.next;
@@ -117,13 +124,15 @@ export const getOrderPositions = async (
 /**
  * Fetches a list of all Orders from Pretix
  * @param organiser - Organiser slug to fetch orders for
- * @param event - Event slug to fetch orders for
+ * @param event - Optional event slug to fetch orders for. Otherwise fetches across all events
  * @returns An array of PretixOrders
  */
-export const getOrders = async (organiser: string, event: string): Promise<PretixOrder[]> =>
-  getListFromPretix(
-    `organizers/${encodeURIComponent(organiser)}/events/${encodeURIComponent(event)}/orders`
-  );
+export const getOrders = async (organiser: string, event?: string): Promise<PretixOrder[]> => {
+  const eventComponent = event ? `/events/${encodeURIComponent(event)}` : '';
+  return getListFromPretix(`organizers/${encodeURIComponent(organiser)}${eventComponent}/orders`, {
+    include_canceled_positions: 'true'
+  });
+};
 
 /**
  * Fetches a list of all Items from Pretix
