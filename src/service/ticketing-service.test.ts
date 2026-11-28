@@ -7,7 +7,8 @@ import {
   removeTicketRequirementsFromEvent,
   addTickets,
   saveTicketSyncHistory,
-  getTicketsForUser
+  getTicketsForUser,
+  removeTickets
 } from './ticketing-service';
 
 // --- Mocks -----------------------------------------------------------------
@@ -326,9 +327,95 @@ describe('addTickets', () => {
     await expect(addTickets({ 'acc-1': [volunteer] })).rejects.toThrow('insert failed');
   });
 
-  describe('when every account has an empty ticket list (expected to fail until addTickets checks for this)', () => {
+  describe('when every account has an empty ticket list', () => {
     it('does not run a query', async () => {
       await addTickets({ 'acc-1': [], 'acc-2': [] });
+      expect(mockQuery).not.toHaveBeenCalled();
+    });
+  });
+});
+
+// --- removeTickets ------------------------------------------------------------------
+
+describe('removeTickets', () => {
+  it.each([[undefined], ['']])('does nothing when TICKETING_PROVIDER is %p', async (value) => {
+    setProvider(value);
+    await removeTickets({ 'acc-1': [volunteer] });
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when there are no accounts', async () => {
+    await removeTickets({});
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('removes a single ticket from an account', async () => {
+    await removeTickets({ 'acc-1': [volunteer] });
+    const { sql, params } = lastQuery();
+    expect(sql).toContain('DELETE FROM account_ticket');
+    expect(sql).toContain('WHERE ("accountId", "ticket") IN (($1, $2))');
+    expect(params).toEqual(['acc-1', VOLUNTEER]);
+  });
+
+  it('removes several tickets from one account in a single statement', async () => {
+    await removeTickets({ 'acc-1': [volunteer, dayPass] });
+    const { sql, params } = lastQuery();
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(sql).toContain('IN (($1, $2), ($3, $4))');
+    expect(params).toEqual(['acc-1', VOLUNTEER, 'acc-1', DAY_PASS]);
+  });
+
+  it('removes tickets from several accounts in a single statement', async () => {
+    await removeTickets({ 'acc-1': [volunteer, dayPass], 'acc-2': [meetup] });
+    const { sql, params } = lastQuery();
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(sql).toContain('IN (($1, $2), ($3, $4), ($5, $6))');
+    expect(params).toEqual(['acc-1', VOLUNTEER, 'acc-1', DAY_PASS, 'acc-2', MEETUP]);
+  });
+
+  it('passes a flat list of parameters, not nested pairs', async () => {
+    await removeTickets({ 'acc-1': [volunteer], 'acc-2': [meetup] });
+    const { params } = lastQuery();
+    expect(params.every((param: unknown) => typeof param === 'string')).toBe(true);
+  });
+
+  it('serialises every ticket with ticketToString', async () => {
+    await removeTickets({ 'acc-1': [volunteer, dayPass], 'acc-2': [meetup] });
+    expect(mockTicketToString).toHaveBeenCalledTimes(3);
+    expect(mockTicketToString).toHaveBeenCalledWith(volunteer);
+    expect(mockTicketToString).toHaveBeenCalledWith(dayPass);
+    expect(mockTicketToString).toHaveBeenCalledWith(meetup);
+  });
+
+  it('skips accounts that have no removals, and still remove the others', async () => {
+    await removeTickets({ 'acc-1': [], 'acc-2': [meetup] });
+    const { sql, params } = lastQuery();
+    expect(sql).toContain('IN (($1, $2))');
+    expect(sql).not.toContain('($3, $4)');
+    expect(params).toEqual(['acc-2', MEETUP]);
+  });
+
+  it('uses the pool when no client is given', async () => {
+    await removeTickets({ 'acc-1': [volunteer] });
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the provided client instead of the pool', async () => {
+    const { client, query } = makeClient();
+    await removeTickets({ 'acc-1': [volunteer] }, client);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(lastQuery(query).params).toEqual(['acc-1', VOLUNTEER]);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('propagates database errors', async () => {
+    mockQuery.mockRejectedValueOnce(new Error('remove failed'));
+    await expect(removeTickets({ 'acc-1': [volunteer] })).rejects.toThrow('remove failed');
+  });
+
+  describe('when every account has an empty ticket list', () => {
+    it('does not run a query', async () => {
+      await removeTickets({ 'acc-1': [], 'acc-2': [] });
       expect(mockQuery).not.toHaveBeenCalled();
     });
   });

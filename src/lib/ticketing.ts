@@ -8,7 +8,7 @@
 
 import { inTransaction } from '@/db';
 import { getOrders, getOrganiser, getOrganisers } from '@/service/pretix-service';
-import { addTickets, saveTicketSyncHistory } from '@/service/ticketing-service';
+import { addTickets, removeTickets, saveTicketSyncHistory } from '@/service/ticketing-service';
 
 /**
  * Fetches all purchased tickets from the ticketing provider
@@ -32,26 +32,39 @@ export const syncTickets = async () => {
       )
     ).flat();
 
-    const accountTickets = orders
-      .filter((o) => o.order.status === 'p')
-      .reduce<Record<AccountId, Ticket[]>>((map, { organiser, order }) => {
-        if (order.customer) {
-          if (!map[order.customer]) {
-            map[order.customer] = [];
-          }
-          map[order.customer].push(
-            ...order.positions.map<Ticket>((p) => ({
-              provider: 'pretix',
-              organiser,
-              event: order.event,
-              id: p.item
-            }))
-          );
+    const accountTickets = orders.reduce<{
+      paid: Record<AccountId, Ticket[]>;
+      canceled: Record<AccountId, Ticket[]>;
+    }>(
+      (map, { organiser, order }) => {
+        const status =
+          order.status === 'p' ? 'paid' : order.status === 'c' ? 'canceled' : undefined;
+        if (!order.customer || !status) {
+          return map;
         }
+        if (!map[status][order.customer]) {
+          map[status][order.customer] = [];
+        }
+        map[status][order.customer].push(
+          ...order.positions.map<Ticket>((p) => ({
+            provider: 'pretix',
+            organiser,
+            event: order.event,
+            id: p.item
+          }))
+        );
         return map;
-      }, {});
+      },
+      { paid: {}, canceled: {} }
+    );
+
     await inTransaction(async (client) => {
-      await addTickets(accountTickets, client);
+      /* Removing canceled tickets first, then add any paid ones.
+         Doing it in this order ensures that canceled tickets are removed, 
+         but restored if repurchased. */
+      await removeTickets(accountTickets.canceled, client);
+      await addTickets(accountTickets.paid, client);
+      // TODO: Cancel volunteer shifts for any refunded tickets
       await saveTicketSyncHistory(provider, 'success', client);
     });
   } catch (e) {

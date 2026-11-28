@@ -127,6 +127,42 @@ export const addTickets = async (
 };
 
 /**
+ * Removes tickets from the database, by accountId
+ * @param accountTickets Tickets to remove, by AccountId
+ * @param client Optional PoolClient for transactions
+ * @returns Promise<void>
+ */
+export const removeTickets = async (
+  accountTickets: Record<AccountId, Ticket[]>,
+  client?: PoolClient
+) => {
+  const accountIds = Object.keys(accountTickets);
+  if (!process.env.TICKETING_PROVIDER || accountIds.length === 0) {
+    return;
+  }
+  const db = client || pool;
+  const params = accountIds.flatMap((accountId) =>
+    accountTickets[accountId].map<[AccountId, TicketString]>((t) => [accountId, ticketToString(t)])
+  );
+  if (params.length === 0) {
+    return;
+  }
+  const placeholders = params
+    .map((_, index) => {
+      const base = index * 2;
+      return `($${base + 1}, $${base + 2})`;
+    })
+    .join(', ');
+  await db.query(
+    `
+    DELETE FROM account_ticket
+    WHERE ("accountId", "ticket") IN (${placeholders})
+    `,
+    params.flat()
+  );
+};
+
+/**
  * Saves sync history to the database
  * @param provider Provider that was synced
  * @param status Status of the sync

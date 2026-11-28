@@ -1,6 +1,6 @@
 import { inTransaction } from '@/db';
 import { getOrders, getOrganiser, getOrganisers } from '@/service/pretix-service';
-import { addTickets, saveTicketSyncHistory } from '@/service/ticketing-service';
+import { addTickets, removeTickets, saveTicketSyncHistory } from '@/service/ticketing-service';
 import { syncTickets } from './ticketing';
 
 // --- Mocks -----------------------------------------------------------------
@@ -15,6 +15,7 @@ jest.mock('@/service/pretix-service', () => ({
 
 jest.mock('@/service/ticketing-service', () => ({
   addTickets: jest.fn(),
+  removeTickets: jest.fn(),
   saveTicketSyncHistory: jest.fn()
 }));
 
@@ -23,6 +24,7 @@ const mockGetOrders = getOrders as unknown as jest.Mock;
 const mockGetOrganiser = getOrganiser as unknown as jest.Mock;
 const mockGetOrganisers = getOrganisers as unknown as jest.Mock;
 const mockAddTickets = addTickets as unknown as jest.Mock;
+const mockRemoveTickets = removeTickets as unknown as jest.Mock;
 const mockSaveHistory = saveTicketSyncHistory as unknown as jest.Mock;
 
 // --- Environment ---------------------------------------------------------------
@@ -80,6 +82,10 @@ const setupPretix = (ordersByOrganiser: Record<string, unknown[]>) => {
 /** Every ticket that was passed to addTickets, whichever account it was for. */
 const savedTickets = (): Ticket[] =>
   Object.values((mockAddTickets.mock.calls[0]?.[0] ?? {}) as Record<string, Ticket[]>).flat();
+
+/** Every ticket that was passed to removeTickets, whichever account it was for. */
+const removedTickets = (): Ticket[] =>
+  Object.values((mockRemoveTickets.mock.calls[0]?.[0] ?? {}) as Record<string, Ticket[]>).flat();
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -263,6 +269,50 @@ describe('syncTickets', () => {
           'cust-2': [makeTicket('org-b', 'meetup', 31)]
         },
         client
+      );
+    });
+
+    it('removes tickets from canceled orders', async () => {
+      setupPretix({
+        'org-a': [makeOrder({ customer: 'cust-1', status: 'c', positions: positions(11) })]
+      });
+
+      await syncTickets();
+
+      expect(mockRemoveTickets).toHaveBeenCalledWith(
+        {
+          'cust-1': [makeTicket('org-a', 'festival-2026', 11)]
+        },
+        client
+      );
+    });
+
+    it('removes tickets before adding new ones', async () => {
+      setupPretix({
+        'org-a': [
+          makeOrder({ customer: 'cust-1', status: 'c', positions: positions(11) }),
+          makeOrder({ customer: 'cust-2', status: 'p', positions: positions(11) })
+        ]
+      });
+
+      await syncTickets();
+
+      expect(mockRemoveTickets).toHaveBeenCalledWith(
+        {
+          'cust-1': [makeTicket('org-a', 'festival-2026', 11)]
+        },
+        client
+      );
+
+      expect(mockAddTickets).toHaveBeenCalledWith(
+        {
+          'cust-2': [makeTicket('org-a', 'festival-2026', 11)]
+        },
+        client
+      );
+
+      expect(mockRemoveTickets.mock.invocationCallOrder[0]).toBeLessThan(
+        mockAddTickets.mock.invocationCallOrder[0]
       );
     });
 
