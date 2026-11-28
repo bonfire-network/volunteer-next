@@ -372,14 +372,19 @@ describe('getEvents / getCustomers', () => {
 describe('getOrders / getOrderPositions', () => {
   it('getOrders requests the event’s orders endpoint', async () => {
     const orders = [{ code: 'ABC12' }];
-    useRoutes({ [`${HOST}/api/v1/organizers/acme/events/fest/orders`]: page(orders) });
+    useRoutes({
+      [`${HOST}/api/v1/organizers/acme/events/fest/orders?include_canceled_positions=true`]:
+        page(orders)
+    });
     const { getOrders } = await load();
 
     await expect(getOrders('acme', 'fest')).resolves.toEqual(orders);
   });
   it('getOrders requests the organiser orders endpoint if event is omitted', async () => {
     const orders = [{ code: 'ABC12' }];
-    useRoutes({ [`${HOST}/api/v1/organizers/acme/orders`]: page(orders) });
+    useRoutes({
+      [`${HOST}/api/v1/organizers/acme/orders?include_canceled_positions=true`]: page(orders)
+    });
     const { getOrders } = await load();
 
     await expect(getOrders('acme')).resolves.toEqual(orders);
@@ -396,7 +401,7 @@ describe('getOrders / getOrderPositions', () => {
   });
 
   it('getOrders follows pagination', async () => {
-    const base = `${HOST}/api/v1/organizers/acme/events/fest/orders`;
+    const base = `${HOST}/api/v1/organizers/acme/events/fest/orders?include_canceled_positions=true`;
     const p2 = `${base}/?page=2`;
     useRoutes({
       [base]: page([{ code: 'A' }], p2),
@@ -415,7 +420,9 @@ describe('getOrders / getOrderPositions', () => {
 
     await getOrders('acme', 'fest');
 
-    expect(calledUrls()).toEqual([`${HOST}/api/v1/organizers/acme/events/fest/orders`]);
+    expect(calledUrls()).toEqual([
+      `${HOST}/api/v1/organizers/acme/events/fest/orders?include_canceled_positions=true`
+    ]);
   });
 });
 
@@ -473,7 +480,8 @@ describe('hardening', () => {
 
     it('URL-encodes organiser and event slugs for orders', async () => {
       useRoutes({
-        [`${HOST}/api/v1/organizers/o%2F1/events/e%201/orders`]: page([{ code: 'A' }])
+        [`${HOST}/api/v1/organizers/o%2F1/events/e%201/orders?include_canceled_positions=true`]:
+          page([{ code: 'A' }])
       });
       const { getOrders } = await load();
 

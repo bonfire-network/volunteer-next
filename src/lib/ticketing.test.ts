@@ -51,7 +51,7 @@ const makeTicket = (
   event: string,
   id: number,
   orderCode: string = 'ABC12'
-): Ticket => ({
+): OrderedTicket => ({
   provider: 'pretix',
   organiser,
   event,

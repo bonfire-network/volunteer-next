@@ -230,7 +230,7 @@ describe('removeTicketRequirementsFromEvent', () => {
 
 // --- addTickets ------------------------------------------------------------------
 
-const makeTicket = (organiser: string, event: string, id: number): Ticket => ({
+const makeTicket = (organiser: string, event: string, id: number): OrderedTicket => ({
   provider: 'pretix',
   organiser,
   event,

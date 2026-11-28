@@ -31,8 +31,8 @@ export const syncTickets = async () => {
     ).flat();
 
     const accountTickets = orders.reduce<{
-      paid: Record<AccountId, Ticket[]>;
-      canceled: Record<AccountId, Ticket[]>;
+      paid: Record<AccountId, OrderedTicket[]>;
+      canceled: Record<AccountId, OrderedTicket[]>;
     }>(
       (map, { organiser, order }) => {
         const status =

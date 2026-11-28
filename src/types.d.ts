@@ -165,7 +165,9 @@ declare global {
     organiser: TicketOrganiser;
     event: TicketEvent;
     id: TicketId;
-    orderRef?: string;
+  }
+  interface OrderedTicket extends Ticket {
+    orderRef: string;
   }
   interface TicketingEventContext {
     name: MultilingualString;

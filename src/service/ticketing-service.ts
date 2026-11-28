@@ -89,7 +89,7 @@ export const removeTicketRequirementsFromEvent = async (
   );
 };
 
-const getAccountTicketParams = (accountTickets: Record<AccountId, Ticket[]>) => {
+const getAccountTicketParams = (accountTickets: Record<AccountId, OrderedTicket[]>) => {
   const accountIdsParam: AccountId[] = [];
   const ticketsParam: TicketString[] = [];
   const orderRefsParam: string[] = [];
@@ -97,7 +97,7 @@ const getAccountTicketParams = (accountTickets: Record<AccountId, Ticket[]>) => 
     for (const ticket of tickets) {
       accountIdsParam.push(accountId);
       ticketsParam.push(ticketToString(ticket));
-      orderRefsParam.push(ticket.orderRef ?? '');
+      orderRefsParam.push(ticket.orderRef);
     }
   }
   return { accountIdsParam, ticketsParam, orderRefsParam };
@@ -110,7 +110,7 @@ const getAccountTicketParams = (accountTickets: Record<AccountId, Ticket[]>) => 
  * @returns Promise<void>
  */
 export const addTickets = async (
-  accountTickets: Record<AccountId, Ticket[]>,
+  accountTickets: Record<AccountId, OrderedTicket[]>,
   client?: PoolClient
 ) => {
   if (!process.env.TICKETING_PROVIDER) {
@@ -140,7 +140,7 @@ export const addTickets = async (
  * @returns Promise<void>
  */
 export const removeTickets = async (
-  accountTickets: Record<AccountId, Ticket[]>,
+  accountTickets: Record<AccountId, OrderedTicket[]>,
   client?: PoolClient
 ) => {
   if (!process.env.TICKETING_PROVIDER) {
@@ -199,7 +199,7 @@ export const getTicketsForUser = async (userId: UserId): Promise<Ticket[]> => {
   }
   const res = await pool.query(
     `
-    SELECT ticket 
+    SELECT ticket, "orderRef"
     FROM account_ticket 
     JOIN account ON account_ticket."accountId" = account."accountId"
     WHERE account."userId" = $1
