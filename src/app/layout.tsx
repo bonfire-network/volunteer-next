@@ -11,13 +11,16 @@ import './theme-overrides.css';
 import { ThemeProvider } from 'next-themes';
 import Script from 'next/script';
 import { NextIntlClientProvider } from 'next-intl';
-import { Theme, Flex } from '@radix-ui/themes';
+import { Theme, Flex, Callout } from '@radix-ui/themes';
 import NavigationFrame from '@/ui/navigation-frame';
 import { currentUser, getCurrentEvent } from '@/session';
 import { getTranslations } from 'next-intl/server';
 import { getEventDateRangeDisplayText } from '@/utils/date';
 import { userToVolunteer } from '@/lib/volunteer';
 import { getPermissionsProfile } from '@/utils/permissions';
+import { isTicketingEnabled } from '@/lib/ticketing';
+import { userHasTicket } from '@/service/ticketing-service';
+import { InfoCircledIcon } from '@radix-ui/react-icons';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('Metadata');
@@ -34,15 +37,29 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const t = await getTranslations('Layout');
   const user = await currentUser();
   const event = await getCurrentEvent();
 
   const navBarTitle = event ? event.name : process.env.APP_NAME;
   const navBarSubtitle = event ? getEventDateRangeDisplayText({ event }) : undefined;
 
+  const showNoTicketWarning =
+    isTicketingEnabled() && event && (!user || !(await userHasTicket(user.id, event.id)));
+
   const mainContent = (
     <Flex asChild direction="column" p="4">
-      <main>{children}</main>
+      <main>
+        {showNoTicketWarning && (
+          <Callout.Root>
+            <Callout.Icon>
+              <InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>{t('needTicket', { eventName: event!.name })}</Callout.Text>
+          </Callout.Root>
+        )}
+        {children}
+      </main>
     </Flex>
   );
 

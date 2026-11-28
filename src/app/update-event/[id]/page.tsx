@@ -27,6 +27,7 @@ import {
   removeTicketRequirementsFromEvent
 } from '@/service/ticketing-service';
 import { ticketToString } from '@/utils/ticket';
+import { isTicketingEnabled } from '@/lib/ticketing';
 
 const PAGE_KEY = 'UpdateEventPage';
 
@@ -93,8 +94,9 @@ export default async function UpdateEvent({ params }: PageProps<`/update-event/[
     permissionsProfile
   );
 
-  const ticketingContext: TicketingContext | undefined =
-    process.env.TICKETING_PROVIDER === 'pretix' ? await getTicketingContext() : undefined;
+  const ticketingContext: TicketingContext | undefined = isTicketingEnabled()
+    ? await getTicketingContext()
+    : undefined;
   const ticketRequirements = await getTicketRequirementsForEvent(event.id);
 
   return (

@@ -1,4 +1,7 @@
 {
+  "Layout": {
+    "needTicket": "You won't be able to sign up for shifts until you have a ticket to {eventName}"
+  },
   "EventsManagementPage": {
     "title": "Events Dashboard",
     "noEvents": "No events yet!",

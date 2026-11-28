@@ -8,15 +8,20 @@ import { inTransaction } from '@/db';
 import { getOrders, getOrganiser, getOrganisers } from '@/service/pretix-service';
 import { addTickets, removeTickets, saveTicketSyncHistory } from '@/service/ticketing-service';
 
+export const isTicketingEnabled = () => {
+  // For now, 'pretix' is the only implemented provider
+  return process.env.TICKETING_PROVIDER === 'pretix';
+};
+
 /**
  * Fetches all purchased tickets from the ticketing provider
  * and updates the database with the most recent data.
  */
 export const syncTickets = async () => {
-  if (process.env.TICKETING_PROVIDER !== 'pretix') {
+  if (!isTicketingEnabled()) {
     return;
   }
-  const provider = process.env.TICKETING_PROVIDER;
+  const provider = process.env.TICKETING_PROVIDER as TicketProvider;
   const systemOrganiser = process.env.PRETIX_ORGANISER;
   try {
     const organisersData = systemOrganiser

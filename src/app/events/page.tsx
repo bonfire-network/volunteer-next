@@ -12,7 +12,7 @@ import { hasEventEnded, hasEventStarted } from '@/utils/date';
 import { unauthorized } from 'next/navigation';
 import { recordToEventFilters } from '@/utils/event-filters';
 import EventFilters from '@/ui/event-filters';
-import { syncTickets } from '@/lib/ticketing';
+import { isTicketingEnabled, syncTickets } from '@/lib/ticketing';
 import ActionButton from '@/ui/action-button';
 
 const PAGE_KEY = 'EventsManagementPage';
@@ -69,7 +69,7 @@ export default async function EventsDashboard({ searchParams }: PageProps<`/even
             <PlusIcon /> {t('createEvent')}
           </NextLink>
         </Button>
-        {process.env.TICKETING_PROVIDER && (
+        {isTicketingEnabled() && (
           <ActionButton variant="soft" action={syncTicketsAction}>
             <ReloadIcon /> {t('syncTickets')}
           </ActionButton>

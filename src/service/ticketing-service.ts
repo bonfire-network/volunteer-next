@@ -5,8 +5,10 @@
  */
 
 import pool from '@/db';
+import { isTicketingEnabled } from '@/lib/ticketing';
 import { ticketFromString, ticketToString } from '@/utils/ticket';
 import { PoolClient } from 'pg';
+import { cache } from 'react';
 
 /**
  * Fetches ticket requirements for an event
@@ -14,7 +16,7 @@ import { PoolClient } from 'pg';
  * @returns A promise resolving to a list of Ticket objects
  */
 export const getTicketRequirementsForEvent = async (event: EventId): Promise<Ticket[]> => {
-  if (!process.env.TICKETING_PROVIDER) {
+  if (!isTicketingEnabled()) {
     return [];
   }
   const res = await pool.query(
@@ -42,7 +44,7 @@ export const addTicketRequirementsToEvent = async (
   toAdd: TicketString[],
   client?: PoolClient
 ) => {
-  if (!process.env.TICKETING_PROVIDER || toAdd.length === 0) {
+  if (!isTicketingEnabled() || toAdd.length === 0) {
     return;
   }
   const db = client || pool;
@@ -75,7 +77,7 @@ export const removeTicketRequirementsFromEvent = async (
   toRemove: TicketString[],
   client?: PoolClient
 ) => {
-  if (!process.env.TICKETING_PROVIDER || toRemove.length === 0) {
+  if (!isTicketingEnabled() || toRemove.length === 0) {
     return;
   }
   const db = client || pool;
@@ -113,7 +115,7 @@ export const addTickets = async (
   accountTickets: Record<AccountId, OrderedTicket[]>,
   client?: PoolClient
 ) => {
-  if (!process.env.TICKETING_PROVIDER) {
+  if (!isTicketingEnabled()) {
     return;
   }
   const db = client || pool;
@@ -143,7 +145,7 @@ export const removeTickets = async (
   accountTickets: Record<AccountId, OrderedTicket[]>,
   client?: PoolClient
 ) => {
-  if (!process.env.TICKETING_PROVIDER) {
+  if (!isTicketingEnabled()) {
     return;
   }
   const db = client || pool;
@@ -175,7 +177,7 @@ export const saveTicketSyncHistory = async (
   status: TicketSyncHistoryStatus,
   client?: PoolClient
 ) => {
-  if (!process.env.TICKETING_PROVIDER) {
+  if (!isTicketingEnabled()) {
     return;
   }
   const db = client || pool;
@@ -194,7 +196,7 @@ export const saveTicketSyncHistory = async (
  * @returns A list of Tickets for that UserId
  */
 export const getTicketsForUser = async (userId: UserId): Promise<Ticket[]> => {
-  if (!process.env.TICKETING_PROVIDER) {
+  if (!isTicketingEnabled()) {
     return [];
   }
   const res = await pool.query(
@@ -208,3 +210,31 @@ export const getTicketsForUser = async (userId: UserId): Promise<Ticket[]> => {
   );
   return res.rows.map((row) => ({ ...ticketFromString(row.ticket), orderRef: row.orderRef }));
 };
+
+/**
+ * Returns whether or not a user has a ticket to an event
+ * @param userId The UserId to check
+ * @param eventId The EventId to check
+ * @returns true if the user has a ticket to the event, or the event does not need tickets
+ */
+export const userHasTicket = cache(async (userId: UserId, eventId: EventId): Promise<boolean> => {
+  if (!isTicketingEnabled()) {
+    return true; // Without a ticketing provider, we all "have tickets"
+  }
+  const res = await pool.query(
+    `
+    SELECT (
+      NOT EXISTS (SELECT 1 FROM ticket_requirement WHERE "eventId" = $2)
+      OR EXISTS (
+        SELECT 1
+        FROM account acc
+        JOIN account_ticket atk ON atk."accountId" = acc."accountId"
+        JOIN ticket_requirement tr ON tr.ticket = atk.ticket
+        WHERE acc."userId" = $1 AND tr."eventId" = $2
+      )
+    ) AS "hasTicket"
+    `,
+    [userId, eventId]
+  );
+  return res.rows[0].hasTicket;
+});
