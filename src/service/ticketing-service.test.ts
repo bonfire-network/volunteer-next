@@ -234,7 +234,8 @@ const makeTicket = (organiser: string, event: string, id: number): Ticket => ({
   provider: 'pretix',
   organiser,
   event,
-  id
+  id,
+  orderRef: `${organiser}/${event}/ABC12`
 });
 
 const volunteer = makeTicket('org-a', 'festival-2026', 11);
@@ -245,6 +246,9 @@ const meetup = makeTicket('org-b', 'meetup', 31);
 const VOLUNTEER = 'pretix:org-a:festival-2026:11';
 const DAY_PASS = 'pretix:org-a:festival-2026:12';
 const MEETUP = 'pretix:org-b:meetup:31';
+const VOLUNTEER_ORDER = 'org-a/festival-2026/ABC12';
+const DAY_PASS_ORDER = 'org-a/festival-2026/ABC12';
+const MEETUP_ORDER = 'org-b/meetup/ABC12';
 
 describe('addTickets', () => {
   it.each([[undefined], ['']])('does nothing when TICKETING_PROVIDER is %p', async (value) => {
@@ -261,31 +265,30 @@ describe('addTickets', () => {
   it('inserts a single ticket for an account', async () => {
     await addTickets({ 'acc-1': [volunteer] });
     const { sql, params } = lastQuery();
-    expect(sql).toContain('INSERT INTO account_ticket ("accountId", "ticket")');
-    expect(sql).toContain('VALUES ($1, $2)');
-    expect(params).toEqual(['acc-1', VOLUNTEER]);
+    expect(sql).toContain('INSERT INTO account_ticket ("accountId", "ticket", "orderRef")');
+    expect(params).toEqual([['acc-1'], [VOLUNTEER], [VOLUNTEER_ORDER]]);
   });
 
   it('inserts several tickets for one account in a single statement', async () => {
     await addTickets({ 'acc-1': [volunteer, dayPass] });
     const { sql, params } = lastQuery();
     expect(mockQuery).toHaveBeenCalledTimes(1);
-    expect(sql).toContain('VALUES ($1, $2), ($3, $4)');
-    expect(params).toEqual(['acc-1', VOLUNTEER, 'acc-1', DAY_PASS]);
+    expect(params).toEqual([
+      ['acc-1', 'acc-1'],
+      [VOLUNTEER, DAY_PASS],
+      [VOLUNTEER_ORDER, DAY_PASS_ORDER]
+    ]);
   });
 
   it('inserts tickets for several accounts in a single statement, keeping each ticket with its own account', async () => {
     await addTickets({ 'acc-1': [volunteer, dayPass], 'acc-2': [meetup] });
     const { sql, params } = lastQuery();
     expect(mockQuery).toHaveBeenCalledTimes(1);
-    expect(sql).toContain('VALUES ($1, $2), ($3, $4), ($5, $6)');
-    expect(params).toEqual(['acc-1', VOLUNTEER, 'acc-1', DAY_PASS, 'acc-2', MEETUP]);
-  });
-
-  it('passes a flat list of parameters, not nested pairs', async () => {
-    await addTickets({ 'acc-1': [volunteer], 'acc-2': [meetup] });
-    const { params } = lastQuery();
-    expect(params.every((param: unknown) => typeof param === 'string')).toBe(true);
+    expect(params).toEqual([
+      ['acc-1', 'acc-1', 'acc-2'],
+      [VOLUNTEER, DAY_PASS, MEETUP],
+      [VOLUNTEER_ORDER, DAY_PASS_ORDER, MEETUP_ORDER]
+    ]);
   });
 
   it('serialises every ticket with ticketToString', async () => {
@@ -298,15 +301,13 @@ describe('addTickets', () => {
 
   it('ignores tickets that are already saved for the account', async () => {
     await addTickets({ 'acc-1': [volunteer] });
-    expect(lastQuery().sql).toContain('ON CONFLICT ("accountId", "ticket") DO NOTHING');
+    expect(lastQuery().sql).toContain('ON CONFLICT DO NOTHING');
   });
 
   it('skips accounts that have no tickets, and still saves the others', async () => {
     await addTickets({ 'acc-1': [], 'acc-2': [meetup] });
     const { sql, params } = lastQuery();
-    expect(sql).toContain('VALUES ($1, $2)');
-    expect(sql).not.toContain('($3, $4)');
-    expect(params).toEqual(['acc-2', MEETUP]);
+    expect(params).toEqual([['acc-2'], [MEETUP], [MEETUP_ORDER]]);
   });
 
   it('uses the pool when no client is given', async () => {
@@ -318,7 +319,7 @@ describe('addTickets', () => {
     const { client, query } = makeClient();
     await addTickets({ 'acc-1': [volunteer] }, client);
     expect(query).toHaveBeenCalledTimes(1);
-    expect(lastQuery(query).params).toEqual(['acc-1', VOLUNTEER]);
+    expect(lastQuery(query).params).toEqual([['acc-1'], [VOLUNTEER], [VOLUNTEER_ORDER]]);
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
@@ -353,30 +354,29 @@ describe('removeTickets', () => {
     await removeTickets({ 'acc-1': [volunteer] });
     const { sql, params } = lastQuery();
     expect(sql).toContain('DELETE FROM account_ticket');
-    expect(sql).toContain('WHERE ("accountId", "ticket") IN (($1, $2))');
-    expect(params).toEqual(['acc-1', VOLUNTEER]);
+    expect(params).toEqual([['acc-1'], [VOLUNTEER], [VOLUNTEER_ORDER]]);
   });
 
   it('removes several tickets from one account in a single statement', async () => {
     await removeTickets({ 'acc-1': [volunteer, dayPass] });
-    const { sql, params } = lastQuery();
+    const { params } = lastQuery();
     expect(mockQuery).toHaveBeenCalledTimes(1);
-    expect(sql).toContain('IN (($1, $2), ($3, $4))');
-    expect(params).toEqual(['acc-1', VOLUNTEER, 'acc-1', DAY_PASS]);
+    expect(params).toEqual([
+      ['acc-1', 'acc-1'],
+      [VOLUNTEER, DAY_PASS],
+      [VOLUNTEER_ORDER, DAY_PASS_ORDER]
+    ]);
   });
 
   it('removes tickets from several accounts in a single statement', async () => {
     await removeTickets({ 'acc-1': [volunteer, dayPass], 'acc-2': [meetup] });
-    const { sql, params } = lastQuery();
-    expect(mockQuery).toHaveBeenCalledTimes(1);
-    expect(sql).toContain('IN (($1, $2), ($3, $4), ($5, $6))');
-    expect(params).toEqual(['acc-1', VOLUNTEER, 'acc-1', DAY_PASS, 'acc-2', MEETUP]);
-  });
-
-  it('passes a flat list of parameters, not nested pairs', async () => {
-    await removeTickets({ 'acc-1': [volunteer], 'acc-2': [meetup] });
     const { params } = lastQuery();
-    expect(params.every((param: unknown) => typeof param === 'string')).toBe(true);
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(params).toEqual([
+      ['acc-1', 'acc-1', 'acc-2'],
+      [VOLUNTEER, DAY_PASS, MEETUP],
+      [VOLUNTEER_ORDER, DAY_PASS_ORDER, MEETUP_ORDER]
+    ]);
   });
 
   it('serialises every ticket with ticketToString', async () => {
@@ -389,10 +389,8 @@ describe('removeTickets', () => {
 
   it('skips accounts that have no removals, and still remove the others', async () => {
     await removeTickets({ 'acc-1': [], 'acc-2': [meetup] });
-    const { sql, params } = lastQuery();
-    expect(sql).toContain('IN (($1, $2))');
-    expect(sql).not.toContain('($3, $4)');
-    expect(params).toEqual(['acc-2', MEETUP]);
+    const { params } = lastQuery();
+    expect(params).toEqual([['acc-2'], [MEETUP], [MEETUP_ORDER]]);
   });
 
   it('uses the pool when no client is given', async () => {
@@ -404,7 +402,7 @@ describe('removeTickets', () => {
     const { client, query } = makeClient();
     await removeTickets({ 'acc-1': [volunteer] }, client);
     expect(query).toHaveBeenCalledTimes(1);
-    expect(lastQuery(query).params).toEqual(['acc-1', VOLUNTEER]);
+    expect(lastQuery(query).params).toEqual([['acc-1'], [VOLUNTEER], [VOLUNTEER_ORDER]]);
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
@@ -500,7 +498,12 @@ describe('getTicketsForUser', () => {
   });
 
   it('converts each row’s ticket string to a Ticket, in row order', async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [{ ticket: VOLUNTEER }, { ticket: MEETUP }] });
+    mockQuery.mockResolvedValueOnce({
+      rows: [
+        { ticket: VOLUNTEER, orderRef: VOLUNTEER_ORDER },
+        { ticket: MEETUP, orderRef: MEETUP_ORDER }
+      ]
+    });
 
     const tickets = await getTicketsForUser(USER_ID);
 

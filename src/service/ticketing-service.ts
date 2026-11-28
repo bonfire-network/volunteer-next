@@ -89,6 +89,20 @@ export const removeTicketRequirementsFromEvent = async (
   );
 };
 
+const getAccountTicketParams = (accountTickets: Record<AccountId, Ticket[]>) => {
+  const accountIdsParam: AccountId[] = [];
+  const ticketsParam: TicketString[] = [];
+  const orderRefsParam: string[] = [];
+  for (const [accountId, tickets] of Object.entries(accountTickets)) {
+    for (const ticket of tickets) {
+      accountIdsParam.push(accountId);
+      ticketsParam.push(ticketToString(ticket));
+      orderRefsParam.push(ticket.orderRef ?? '');
+    }
+  }
+  return { accountIdsParam, ticketsParam, orderRefsParam };
+};
+
 /**
  * Saves tickets to the database, by accountId
  * @param accountTickets Tickets to add, by AccountId
@@ -99,30 +113,23 @@ export const addTickets = async (
   accountTickets: Record<AccountId, Ticket[]>,
   client?: PoolClient
 ) => {
-  const accountIds = Object.keys(accountTickets);
-  if (!process.env.TICKETING_PROVIDER || accountIds.length === 0) {
+  if (!process.env.TICKETING_PROVIDER) {
     return;
   }
   const db = client || pool;
-  const params = accountIds.flatMap((accountId) =>
-    accountTickets[accountId].map<[AccountId, TicketString]>((t) => [accountId, ticketToString(t)])
-  );
-  if (params.length === 0) {
+  const { accountIdsParam, ticketsParam, orderRefsParam } = getAccountTicketParams(accountTickets);
+
+  if (accountIdsParam.length === 0) {
     return;
   }
-  const placeholders = params
-    .map((_, index) => {
-      const base = index * 2;
-      return `($${base + 1}, $${base + 2})`;
-    })
-    .join(', ');
+
   await db.query(
     `
-    INSERT INTO account_ticket ("accountId", "ticket")
-    VALUES ${placeholders}
-    ON CONFLICT ("accountId", "ticket") DO NOTHING
+    INSERT INTO account_ticket ("accountId", "ticket", "orderRef")
+    SELECT * FROM unnest($1::text[], $2::text[], $3::text[])
+    ON CONFLICT DO NOTHING
     `,
-    params.flat()
+    [accountIdsParam, ticketsParam, orderRefsParam]
   );
 };
 
@@ -136,29 +143,23 @@ export const removeTickets = async (
   accountTickets: Record<AccountId, Ticket[]>,
   client?: PoolClient
 ) => {
-  const accountIds = Object.keys(accountTickets);
-  if (!process.env.TICKETING_PROVIDER || accountIds.length === 0) {
+  if (!process.env.TICKETING_PROVIDER) {
     return;
   }
   const db = client || pool;
-  const params = accountIds.flatMap((accountId) =>
-    accountTickets[accountId].map<[AccountId, TicketString]>((t) => [accountId, ticketToString(t)])
-  );
-  if (params.length === 0) {
+  const { accountIdsParam, ticketsParam, orderRefsParam } = getAccountTicketParams(accountTickets);
+  if (accountIdsParam.length === 0) {
     return;
   }
-  const placeholders = params
-    .map((_, index) => {
-      const base = index * 2;
-      return `($${base + 1}, $${base + 2})`;
-    })
-    .join(', ');
+
   await db.query(
     `
     DELETE FROM account_ticket
-    WHERE ("accountId", "ticket") IN (${placeholders})
+    WHERE ("accountId", "ticket", "orderRef") IN (
+      SELECT * FROM unnest($1::text[], $2::text[], $3::text[])
+    )
     `,
-    params.flat()
+    [accountIdsParam, ticketsParam, orderRefsParam]
   );
 };
 
@@ -205,5 +206,5 @@ export const getTicketsForUser = async (userId: UserId): Promise<Ticket[]> => {
     `,
     [userId]
   );
-  return res.rows.map((row) => ticketFromString(row.ticket));
+  return res.rows.map((row) => ({ ...ticketFromString(row.ticket), orderRef: row.orderRef }));
 };

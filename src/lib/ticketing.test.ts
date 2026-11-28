@@ -46,11 +46,17 @@ const setEnv = (key: (typeof ENV_KEYS)[number], value?: string) => {
 /** Stands in for the PoolClient that inTransaction hands to its callback. */
 const client = { name: 'transaction-client' };
 
-const makeTicket = (organiser: string, event: string, id: number): Ticket => ({
+const makeTicket = (
+  organiser: string,
+  event: string,
+  id: number,
+  orderCode: string = 'ABC12'
+): Ticket => ({
   provider: 'pretix',
   organiser,
   event,
-  id
+  id,
+  orderRef: `${organiser}/${event}/${orderCode}`
 });
 
 /** One order position per item id. */
@@ -230,7 +236,7 @@ describe('syncTickets', () => {
       await syncTickets();
 
       expect(mockAddTickets).toHaveBeenCalledWith(
-        { 'cust-2': [makeTicket('org-a', 'festival-2026', 11)] },
+        { 'cust-2': [makeTicket('org-a', 'festival-2026', 11, 'DEF34')] },
         client
       );
     });
@@ -248,8 +254,11 @@ describe('syncTickets', () => {
 
       expect(mockAddTickets).toHaveBeenCalledWith(
         {
-          'cust-1': [makeTicket('org-a', 'festival-2026', 11), makeTicket('org-a', 'workshop', 21)],
-          'cust-2': [makeTicket('org-a', 'festival-2026', 12)]
+          'cust-1': [
+            makeTicket('org-a', 'festival-2026', 11, 'A'),
+            makeTicket('org-a', 'workshop', 21, 'B')
+          ],
+          'cust-2': [makeTicket('org-a', 'festival-2026', 12, 'C')]
         },
         client
       );

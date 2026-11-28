@@ -1,9 +1,10 @@
 create table "account_ticket" (
     "accountId" text not null,
     "ticket" text not null,
+    "orderRef" text not null,
     "createdAt" timestamptz default CURRENT_TIMESTAMP not null,
     "updatedAt" timestamptz default CURRENT_TIMESTAMP not null,
-    primary key ("accountId", "ticket")
+    primary key ("accountId", "ticket", "orderRef")
 );
 
 CREATE TYPE sync_status AS ENUM ('success', 'timeout', 'refused');

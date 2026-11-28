@@ -4,8 +4,6 @@
  * @author Michael Townsend <@continuities>
  */
 
-'use server';
-
 import { inTransaction } from '@/db';
 import { getOrders, getOrganiser, getOrganisers } from '@/service/pretix-service';
 import { addTickets, removeTickets, saveTicketSyncHistory } from '@/service/ticketing-service';
@@ -42,17 +40,19 @@ export const syncTickets = async () => {
         if (!order.customer || !status) {
           return map;
         }
-        if (!map[status][order.customer]) {
-          map[status][order.customer] = [];
-        }
-        map[status][order.customer].push(
-          ...order.positions.map<Ticket>((p) => ({
+        for (const position of order.positions) {
+          const positionStatus = status === 'canceled' || position.canceled ? 'canceled' : 'paid';
+          if (!map[positionStatus][order.customer]) {
+            map[positionStatus][order.customer] = [];
+          }
+          map[positionStatus][order.customer].push({
             provider: 'pretix',
             organiser,
             event: order.event,
-            id: p.item
-          }))
-        );
+            id: position.item,
+            orderRef: `${organiser}/${order.event}/${order.code}`
+          });
+        }
         return map;
       },
       { paid: {}, canceled: {} }
