@@ -59,9 +59,6 @@ export const syncTickets = async () => {
     );
 
     await inTransaction(async (client) => {
-      /* Removing canceled tickets first, then add any paid ones.
-         Doing it in this order ensures that canceled tickets are removed, 
-         but restored if repurchased. */
       await removeTickets(accountTickets.canceled, client);
       await addTickets(accountTickets.paid, client);
       // TODO: Cancel volunteer shifts for any refunded tickets
